@@ -409,39 +409,37 @@ class Pages(private val act: MainActivity) {
                 act.pickApk { log.text = it }
             }
         }
-        card(root, "輸入法管理（需 Shizuku）") {
+        card(root, "輸入法管理") {
+            hint("清單直接讀系統，不需 Shizuku；設為預設／啟用／停用需要 Shizuku。")
             val box = ui.vbox()
             addView(box)
-            button("載入輸入法清單") {
-                if (!Shell.ready()) { requestShizuku(); return@button }
-                ImeManager.list { imes, cur -> fillIme(box, imes, cur) }
-            }
+            button("載入輸入法清單") { ImeManager.list { imes, cur -> fillIme(box, imes, cur) } }
         }
     }
 
     private fun fillIme(box: LinearLayout, imes: List<ImeManager.Ime>, cur: String): Unit = with(ui) {
         box.removeAllViews()
-        if (imes.isEmpty()) { box.hint("讀不到清單"); return@with }
+        if (imes.isEmpty()) { box.hint("系統沒有回報任何輸入法"); return@with }
         for (ime in imes) {
-            val pkg = ime.id.substringBefore('/')
-            box.text((if (ime.id == cur) "★ " else "") + Apps.label(act, pkg) + (if (!ime.enabled) "（已停用）" else ""), bold = ime.id == cur)
+            box.text((if (ime.id == cur) "★ " else "") + ime.label + (if (!ime.enabled) "（已停用）" else ""), bold = ime.id == cur)
             box.hint(ime.id)
             val row = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL }
-            fun small(label: String, cmd: String) {
+            fun small(label: String, action: String) {
                 row.addView(TextView(act).apply {
                     text = label; setTextColor(accent); textSize = 13.5f
                     setPadding(0, dp(4), dp(18), dp(10))
                     setOnClickListener {
-                        ImeManager.run(cmd) { r ->
-                            act.toast(if (r.ok) "完成" else "失敗：$r")
+                        if (!Shell.ready()) { requestShizuku(); return@setOnClickListener }
+                        ImeManager.run(action, ime.id) { r ->
+                            if (r.ok) act.toast("完成") else act.showText("操作失敗", r.toString().ifBlank { "錯誤碼 ${r.code}" })
                             ImeManager.list { a, c -> fillIme(box, a, c) }
                         }
                     }
                 })
             }
-            if (ime.id != cur) small("設為預設", "ime enable ${Shell.q(ime.id)} && ime set ${Shell.q(ime.id)}")
-            if (ime.enabled && ime.id != cur) small("停用", "ime disable ${Shell.q(ime.id)}")
-            if (!ime.enabled) small("啟用", "ime enable ${Shell.q(ime.id)}")
+            if (ime.id != cur) small("設為預設", "set")
+            if (ime.enabled && ime.id != cur) small("停用", "disable")
+            if (!ime.enabled) small("啟用", "enable")
             box.addView(row)
         }
     }

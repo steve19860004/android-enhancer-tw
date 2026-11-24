@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.SystemServiceHelper
@@ -140,20 +141,34 @@ object SilentInstall {
     }
 }
 
-/** 輸入法管理 */
+/** 輸入法管理：清單用系統 API 讀（不需 Shizuku），操作才用 Shizuku */
 object ImeManager {
-    data class Ime(val id: String, val enabled: Boolean)
+    data class Ime(val id: String, val label: String, val enabled: Boolean)
 
     fun list(cb: (List<Ime>, String) -> Unit) {
         App.bg {
-            val all = Shell.exec("ime list -a -s").out.lines().map { it.trim() }.filter { it.contains('/') }
-            val enabled = Shell.exec("ime list -s").out.lines().map { it.trim() }.toSet()
-            val cur = Settings.Secure.getString(App.app.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: ""
-            App.ui { cb(all.map { Ime(it, it in enabled) }, cur) }
+            val ctx = App.app
+            val imm = ctx.getSystemService(InputMethodManager::class.java)
+            val enabled = imm.enabledInputMethodList.map { it.id }.toSet()
+            val all = imm.inputMethodList.map {
+                Ime(it.id, it.loadLabel(ctx.packageManager).toString(), it.id in enabled)
+            }.sortedWith(compareByDescending<Ime> { it.enabled }.thenBy { it.label })
+            val cur = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: ""
+            App.ui { cb(all, cur) }
         }
     }
 
-    fun run(cmd: String, cb: (Shell.Result) -> Unit) {
-        App.bg { val r = Shell.exec(cmd); App.ui { cb(r) } }
+    /** action：enable / disable / set。`ime` 只是包裝腳本，部分 ROM 沒有，直接呼叫底層服務 */
+    fun run(action: String, id: String, cb: (Shell.Result) -> Unit) {
+        App.bg {
+            val q = Shell.q(id)
+            val cmd = when (action) {
+                "set" -> "cmd input_method enable $q; cmd input_method set $q"
+                else -> "cmd input_method $action $q"
+            }
+            var r = Shell.exec(cmd)
+            if (!r.ok) r = Shell.exec(cmd.replace("cmd input_method", "ime"))
+            App.ui { cb(r) }
+        }
     }
 }

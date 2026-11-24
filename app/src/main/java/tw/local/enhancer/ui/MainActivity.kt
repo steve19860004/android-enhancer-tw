@@ -52,6 +52,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        actionBar?.hide()  // 用自己畫的標題，不要系統標題列（避免重複）
         ui = Ui(this)
         pages = Pages(this)
         window.statusBarColor = ui.pageBg
