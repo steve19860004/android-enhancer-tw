@@ -34,6 +34,26 @@ class MainActivity : Activity() {
         const val REQ_IMPORT = 102
         const val REQ_APK = 103
         private const val K_TAB = "ui_tab"
+        /** 目前有焦點的主畫面（時間軸流程從前景 Activity 開設定頁較不會被擋） */
+        @Volatile var focused: MainActivity? = null
+    }
+
+    /** 時間軸分頁的狀態文字，流程執行時即時更新 */
+    var timelineStatus: TextView? = null
+    private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == tw.local.enhancer.feature.timeline.TimelineFlow.K_STATUS) {
+            timelineStatus?.text = Prefs.str(key, "尚未測試")
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) focused = this else if (focused === this) focused = null
+    }
+
+    override fun onPause() {
+        Prefs.unlisten(prefListener)
+        super.onPause()
     }
 
     val tabs = listOf(
@@ -96,6 +116,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        Prefs.listen(prefListener)
         render()
     }
 
@@ -128,6 +149,7 @@ class MainActivity : Activity() {
             tabBar.addView(t, lp)
         }
         content.removeAllViews()
+        timelineStatus = null
         when (cur) {
             "sw" -> pages.switcher(content)
             "t1" -> pages.callMusic(content)

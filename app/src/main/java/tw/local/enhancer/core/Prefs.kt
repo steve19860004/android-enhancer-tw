@@ -22,6 +22,12 @@ object Prefs {
     fun put(k: String, v: String) = sp.edit().putString(k, v).apply()
     fun put(k: String, v: Set<String>) = sp.edit().putStringSet(k, v).apply()
     fun remove(k: String) = sp.edit().remove(k).apply()
+    /** 同步寫入（流程中途斷電／被殺也不會遺失），回傳是否成功 */
+    fun putNow(k: String, v: Int): Boolean = sp.edit().putInt(k, v).commit()
+    fun putNow(k: String, v: Long): Boolean = sp.edit().putLong(k, v).commit()
+    fun removeNow(k: String): Boolean = sp.edit().remove(k).commit()
+    fun listen(l: SharedPreferences.OnSharedPreferenceChangeListener) = sp.registerOnSharedPreferenceChangeListener(l)
+    fun unlisten(l: SharedPreferences.OnSharedPreferenceChangeListener) = sp.unregisterOnSharedPreferenceChangeListener(l)
     fun has(k: String) = sp.contains(k)
 
     /** 這些是執行期狀態，不應被備份或還原 */

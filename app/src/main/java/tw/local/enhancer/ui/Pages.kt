@@ -30,7 +30,7 @@ import tw.local.enhancer.feature.switcher.RecentTracker
 import tw.local.enhancer.feature.tools.CircleSearch
 import tw.local.enhancer.feature.tools.ImeManager
 import tw.local.enhancer.feature.tools.PowerCamera
-import tw.local.enhancer.feature.tools.TimelineDpi
+import tw.local.enhancer.feature.timeline.TimelineFlow
 import tw.local.enhancer.feature.translate.Langs
 import tw.local.enhancer.feature.translate.ScrollTranslator
 import tw.local.enhancer.feature.voice.VoiceIntercept
@@ -427,12 +427,7 @@ class Pages(private val act: MainActivity) {
             toggle("備援偵測（系統手勢無效時用）", PowerCamera.K_FALLBACK, false,
                 "需無障礙服務。快速按兩下電源鍵（熄屏→亮屏間隔很短）就開相機。")
         }
-        card(root, "Google 地圖時間軸（640dp）") {
-            hint("把顯示最小寬度調成約 640dp（平板版面）再開時間軸；用完記得還原。需 Shizuku。")
-            button("套用 640dp 並開啟時間軸", primary = true) { TimelineDpi.apply(act) { act.toast(it) } }
-            button("還原顯示大小") { TimelineDpi.reset { act.toast(it) } }
-            button("只開啟時間軸") { TimelineDpi.openTimeline(act) }
-        }
+        timeline(root)
         card(root, "Shizuku 靜默安裝 APK") {
             val log = text("選一個 APK 檔，直接安裝不跳確認畫面。", 13f, color = textSub)
             button("選擇 APK 並安裝") {
@@ -446,6 +441,89 @@ class Pages(private val act: MainActivity) {
             addView(box)
             button("載入輸入法清單") { ImeManager.list { imes, cur -> fillIme(box, imes, cur) } }
         }
+    }
+
+    // ---- 時間軸助手（移植自 Timeline-NoPair 0.26，免 Shizuku） ----
+
+    private fun timeline(root: LinearLayout) = with(ui) {
+        card(root, "Google 地圖時間軸（時間軸助手）") {
+            hint("免 root、免 Shizuku。自動把最小寬度改成 640 dp → 強制停止 Google 地圖與 Google Play 服務 → 還原並核對原始寬度。")
+            if (!Perms.a11y(act)) status("無障礙服務", false) { Perms.openA11y(act) }
+            text("首次設定：請先在開發人員選項查看並截圖保存原本的「最小寬度」。第一次先別修改，返回這裡記下原值。", 13.5f)
+            button("開啟開發人員選項／查看原值") { openDev() }
+            val w = Prefs.int(TimelineFlow.K_WIDTH, -1)
+            text(if (w > 0) "你的原始寬度：$w dp" else "尚未保存原始寬度", bold = true)
+            button("記下我的原始寬度") { rememberWidth() }
+            if (TimelineFlow.hasPending()) {
+                text("⚠ 上次流程未完成，待還原寬度 ${TimelineFlow.pendingWidth()} dp", 13f, color = badColor)
+            }
+        }
+        card(root, "自動執行") {
+            hint("先保存原寬度並開啟無障礙服務，再按「開始自動測試」。請在出發前測試。若設定頁沒有自動定位，請手動滑到最小寬度。")
+            button("開始自動測試", primary = true) { TimelineFlow.runManual(act, false) }
+            button("僅還原畫面大小") { TimelineFlow.runManual(act, true) }
+            val auto = toggle("每次開機解鎖後自動執行", TimelineFlow.K_AUTO)
+            auto.setOnCheckedChangeListener { b, on ->
+                if (on && !Prefs.bool(TimelineFlow.K_TESTED)) {
+                    b.isChecked = false
+                    act.toast("請先讓「開始自動測試」成功跑完一次")
+                } else Prefs.put(TimelineFlow.K_AUTO, on)
+            }
+            val daily = toggle("每日自動執行", TimelineFlow.K_DAILY)
+            val timeBtn = button(TimelineFlow.dailyLabel(Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT))) { }
+            daily.setOnCheckedChangeListener { b, on ->
+                if (on && Prefs.int(TimelineFlow.K_WIDTH, -1) <= 0) {
+                    b.isChecked = false
+                    act.toast("請先記下並保存原始寬度")
+                } else TimelineFlow.setDaily(on, Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT))
+            }
+            timeBtn.setOnClickListener {
+                val m = Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT)
+                android.app.TimePickerDialog(act, { _, hh, mm ->
+                    val v = hh * 60 + mm
+                    TimelineFlow.setDaily(daily.isChecked, v)
+                    timeBtn.text = TimelineFlow.dailyLabel(v)
+                }, m / 60, m % 60, true).show()
+            }
+            hint("依手機當地時間執行。鎖定或熄屏時，會等到亮屏並解鎖後再執行。請避開導航時段。")
+            text("狀態", bold = true)
+            act.timelineStatus = text(Prefs.str(TimelineFlow.K_STATUS, "尚未測試"), 13f, color = textSub)
+        }
+        card(root, "手動操作") {
+            button("1　開啟設定頁，自行調成 640 dp") {
+                if (Prefs.int(TimelineFlow.K_WIDTH, -1) <= 0) act.toast("請先記下原本的最小寬度") else openDev()
+            }
+            button("2　開啟 Google 地圖資訊") { appDetails("com.google.android.apps.maps") }
+            button("3　開啟 Google Play 服務資訊") { appDetails("com.google.android.gms") }
+            hint("在上述兩個資訊頁分別點「強制停止」並確認。若系統不允許停止，請還原寬度並結束。")
+            button("4　開啟設定，還原我的寬度") { openDev() }
+            hint("兩項都停止後，直接把最小寬度改回原值。")
+        }
+    }
+
+    private fun openDev() {
+        runCatching { act.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
+            .onFailure { act.toast("請從手機設定手動開啟開發人員選項") }
+    }
+
+    private fun appDetails(pkg: String) {
+        runCatching {
+            act.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
+        }.onFailure { act.toast("請從手機設定手動開啟這個頁面") }
+    }
+
+    private fun rememberWidth() {
+        val et = android.widget.EditText(act).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = "填入修改前看到的 dp"
+        }
+        AlertDialog.Builder(act).setTitle("保存原本的最小寬度").setView(et)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("保存") { _, _ ->
+                val v = et.text.toString().trim().toIntOrNull()
+                if (v == null || v < 1 || v > 4096) act.toast("請輸入設定中顯示的數值")
+                else { Prefs.put(TimelineFlow.K_WIDTH, v); act.render() }
+            }.show()
     }
 
     private fun fillIme(box: LinearLayout, imes: List<ImeManager.Ime>, cur: String): Unit = with(ui) {

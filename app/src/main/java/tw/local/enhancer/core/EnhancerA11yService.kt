@@ -9,6 +9,7 @@ import android.view.accessibility.AccessibilityEvent
 import tw.local.enhancer.feature.photoguard.PhotoGuard
 import tw.local.enhancer.feature.strict.StrictMode
 import tw.local.enhancer.feature.switcher.RecentTracker
+import tw.local.enhancer.feature.timeline.TimelineFlow
 import tw.local.enhancer.feature.tools.PowerCamera
 import tw.local.enhancer.feature.translate.ScrollTranslator
 import tw.local.enhancer.feature.voice.VoiceIntercept
@@ -52,6 +53,7 @@ class EnhancerA11yService : AccessibilityService() {
             addAction(Intent.ACTION_SCREEN_ON)
         }
         registerReceiver(screenReceiver, f)
+        TimelineFlow.attach(this)
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
@@ -59,6 +61,7 @@ class EnhancerA11yService : AccessibilityService() {
         if (e.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED &&
             (VoiceIntercept.enabled() || VoiceIntercept.capturing())
         ) scanWindows()
+        TimelineFlow.onEvent(e)
         val pkg = e.packageName?.toString() ?: return
         VoiceIntercept.onAnyPackage(this, pkg)
         if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -107,6 +110,7 @@ class EnhancerA11yService : AccessibilityService() {
     private fun cleanup() {
         if (instance == null) return
         ScrollTranslator.stop()
+        TimelineFlow.detach(this)
         runCatching { unregisterReceiver(screenReceiver) }
         instance = null
     }
