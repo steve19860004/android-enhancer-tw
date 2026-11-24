@@ -58,6 +58,14 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 }
             }
         }
+        card(root, "APK 匯出備份（免 Shizuku）") {
+            hint("把已安裝的 App 匯出成 APK 檔，方便換機、備份或分享。有分割檔的 App 會匯出成 .apks（zip）。不需要 Shizuku。")
+            button("選擇要匯出的 App", primary = true) {
+                AppPicker.show(act, "選擇要匯出 APK 的 App", emptySet(), multi = false, includeSystem = true) { sel ->
+                    sel.firstOrNull()?.let { act.exportApk(it) }
+                }
+            }
+        }
         card(root, "動畫速度") {
             val cur = SysTools.animScale(act)
             text("目前：${fmt(cur)} 倍", 13f, color = textSub)
