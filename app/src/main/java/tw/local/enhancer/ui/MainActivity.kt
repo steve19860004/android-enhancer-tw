@@ -84,7 +84,7 @@ class MainActivity : Activity() {
         val root = ui.vbox().apply { setBackgroundColor(ui.pageBg); fitsSystemWindows = true }
         val header = ui.vbox().apply { setPadding(ui.dp(18), ui.dp(14), ui.dp(18), ui.dp(4)) }
         header.addView(TextView(this).apply {
-            text = "Android補強工具箱"
+            text = "免Root百寶箱"
             textSize = 21f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(ui.textMain)

@@ -630,8 +630,13 @@ class Pages(private val act: MainActivity) {
         }
         card(root, "關於") {
             val v = runCatching { act.packageManager.getPackageInfo(act.packageName, 0).versionName }.getOrNull() ?: "?"
-            text("Android補強工具箱 v$v", bold = true)
+            text("免Root百寶箱 v$v", bold = true)
             hint("全部功能免 root。需要高權限的部分透過 Shizuku 執行；畫面內容只在本機即時處理，不儲存也不上傳。")
+            hint("© 2026 steve19860004｜授權 GPLv3（本程式不提供任何擔保）")
+            hint("本 App 為獨立重製，與「Android補強整合CN」無關，亦非其官方版本。")
+            button("GitHub 專案頁") {
+                runCatching { act.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/steve19860004/android-enhancer-tw"))) }
+            }
         }
     }
 }
