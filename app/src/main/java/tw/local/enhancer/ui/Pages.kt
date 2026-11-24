@@ -75,7 +75,7 @@ class Pages(private val act: MainActivity) {
 
     fun requestShizuku() {
         if (!Shell.running()) {
-            act.showText("Shizuku 未啟動", "請先安裝並開啟 Shizuku App，用「無線偵錯」啟動服務後再回來授權。")
+            act.showText("Shizuku 未啟動", "請先安裝並啟動 Shizuku 服務後再回來授權。\n\n建議裝「Shizuku-Next」（Shizuku 的強化分支，相容本 App）：用「無線偵錯」啟動一次、開啟「開機自動啟動」後，重開機會自動啟動，被系統關掉也會自動重啟，很多功能就不會因為重開機而失效。\n注意：它與官方 Shizuku 簽章不同，已裝官方版要先解除安裝。\n下載：github.com/rushiranpise/Shizuku-Next")
             return
         }
         Shell.request { granted -> App.ui { act.toast(if (granted) "Shizuku 已授權" else "未授權"); act.render() } }
@@ -331,7 +331,7 @@ class Pages(private val act: MainActivity) {
         }
         card(root, "自動嚴格模式（進入指定 App 時自動隱身）") {
             hint("進入你勾選的 App（銀行、支付、超商等）時，自動「真的」關閉開發者選項、USB 偵錯與無線偵錯，離開或鎖屏後恢復原狀。不偽裝任何數值，只是幫你自動做原本要手動做的事。")
-            text("⚠ 關閉偵錯會讓 Shizuku 中斷，離開後請重新啟動 Shizuku（Shizuku 13.5+ 可在其設定開啟「開機／連上 Wi-Fi 時自動啟動」）。", 13f, color = badColor)
+            text("⚠ 關閉偵錯會讓 Shizuku 中斷，離開後需重新啟動 Shizuku（建議用 Shizuku-Next 並開「開機自動啟動」，會自動重連）。", 13f, color = badColor)
             toggle("啟用嚴格模式", StrictMode.K_ENABLED)
             text(StrictMode.stateText(act), 13f, color = textSub)
         }
@@ -518,7 +518,7 @@ class Pages(private val act: MainActivity) {
                     act.toast("請先成功執行一次")
                 } else Prefs.put(TimelineFlow.K_AUTO, on)
             }
-            if (shz) hint("Shizuku 模式：開機後 Shizuku 啟動（可在 Shizuku 設定開機自動啟動）才會執行。")
+            if (shz) hint("Shizuku 模式：開機後 Shizuku 已啟動才會執行。建議用 Shizuku-Next 並開「開機自動啟動」，重開機後會自動啟動保活。")
             val daily = toggle("每日自動執行", TimelineFlow.K_DAILY)
             val timeBtn = button(TimelineFlow.dailyLabel(Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT))) { }
             daily.setOnCheckedChangeListener { b, on ->
@@ -632,6 +632,7 @@ class Pages(private val act: MainActivity) {
             val v = runCatching { act.packageManager.getPackageInfo(act.packageName, 0).versionName }.getOrNull() ?: "?"
             text("免Root百寶箱 v$v", bold = true)
             hint("全部功能免 root。需要高權限的部分透過 Shizuku 執行；畫面內容只在本機即時處理，不儲存也不上傳。")
+            hint("建議搭配 Shizuku-Next（開機自動啟動、保活，重開機不被關）：github.com/rushiranpise/Shizuku-Next")
             hint("© 2026 steve19860004｜授權 GPLv3（本程式不提供任何擔保）")
             hint("本 App 為獨立重製，與「Android補強整合CN」無關，亦非其官方版本。")
             button("GitHub 專案頁") {
