@@ -1,6 +1,6 @@
-# Android補強工具箱（免 root）
+# 免Root百寶箱
 
-參考「Android補強整合CN」的功能，自己重寫的整合工具箱，給陸版 ROM（vivo／iQOO、小米、OPPO）和一般 Android 用。
+免 root 的 Android 整合工具箱，給陸版 ROM（vivo／iQOO、小米、OPPO）和一般 Android 用。
 全部免 root，需要高權限的部分透過 **Shizuku**。套件名：`tw.local.enhancer`，最低 Android 10。
 
 ## 功能
@@ -35,3 +35,10 @@
 2. 本 App「⚙ 設定」→「授權 Shizuku」→「一鍵透過 Shizuku 授予全部權限」。
    （Android 13+ 側載 App 會自動解除「受限制的設定」，無障礙才開得起來。）
 3. 到各分頁打開要用的功能。
+
+## 授權與聲明
+
+- 授權：**GPLv3**（見 `LICENSE`）。歡迎自由使用、修改、散布；衍生版本須同樣以 GPLv3 開源並標示出處。附專有函式庫連結例外（Google ML Kit），詳見 `NOTICE.md`。
+- 版權：© 2026 steve19860004。
+- **獨立重製聲明**：本專案為獨立重製，以全新程式碼撰寫，未複製任何第三方 App 原始碼；與「Android補強整合CN／Android_Enhancer_CN」無關，亦非其官方版本。
+- 本程式不提供任何擔保，使用風險自負。請僅用於自己的裝置與合法用途。
