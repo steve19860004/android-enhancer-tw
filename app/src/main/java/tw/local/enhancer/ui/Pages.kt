@@ -73,7 +73,7 @@ class Pages(private val act: MainActivity) {
         Req.WRITE_SECURE -> Perms.writeSecure(act)
     }
 
-    private fun requestShizuku() {
+    fun requestShizuku() {
         if (!Shell.running()) {
             act.showText("Shizuku 未啟動", "請先安裝並開啟 Shizuku App，用「無線偵錯」啟動服務後再回來授權。")
             return
@@ -81,7 +81,7 @@ class Pages(private val act: MainActivity) {
         Shell.request { granted -> App.ui { act.toast(if (granted) "Shizuku 已授權" else "未授權"); act.render() } }
     }
 
-    private fun grantAll() {
+    fun grantAll() {
         if (!Shell.ready()) { requestShizuku(); return }
         App.bg {
             val log = Perms.grantAllViaShizuku(act)
@@ -433,6 +433,8 @@ class Pages(private val act: MainActivity) {
         timeline(root)
         card(root, "Shizuku 靜默安裝 APK") {
             val log = text("選一個 APK 檔，直接安裝不跳確認畫面。", 13f, color = textSub)
+            toggle("安裝來源偽裝成 Google Play 商店", tw.local.enhancer.feature.tools.SilentInstall.K_AS_PLAY, false,
+                "有些 App 會檢查是不是從 Play 商店安裝（例如部分 Google App、銀行 App），打開可避開這類限制。")
             button("選擇 APK 並安裝") {
                 if (!Shell.ready()) { requestShizuku(); return@button }
                 act.pickApk { log.text = it }

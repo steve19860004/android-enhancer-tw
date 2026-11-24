@@ -99,9 +99,13 @@ object PowerCamera {
 
 /** Shizuku 靜默安裝 APK：直接把檔案串流給 pm install */
 object SilentInstall {
+    const val K_AS_PLAY = "t6_install_as_play"
+
     fun install(input: InputStream, size: Long, cb: (Shell.Result) -> Unit) {
         App.bg {
-            val r = if (size > 0) Shell.execWithStdin("pm install -r -S $size", input)
+            // 安裝來源標成 Play 商店，避開「只接受從 Play 安裝」的檢查
+            val src = if (tw.local.enhancer.core.Prefs.bool(K_AS_PLAY)) "-i com.android.vending " else ""
+            val r = if (size > 0) Shell.execWithStdin("pm install -r ${src}-S $size", input)
             else Shell.Result(-1, "", "無法取得檔案大小")
             App.ui { cb(r) }
         }
