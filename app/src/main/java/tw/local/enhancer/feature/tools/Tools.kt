@@ -17,9 +17,7 @@ import tw.local.enhancer.App
 import tw.local.enhancer.core.Perms
 import tw.local.enhancer.core.Prefs
 import tw.local.enhancer.core.Shell
-import tw.local.enhancer.feature.switcher.FloatingService
 import java.io.InputStream
-import kotlin.math.min
 
 /** 畫圈搜尋（實驗性）：透過 Shizuku 呼叫 VoiceInteractionManagerService.showSessionFromSession */
 object CircleSearch {
@@ -95,37 +93,6 @@ object PowerCamera {
             val action = if (km.isKeyguardLocked) MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA_SECURE
             else MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
             runCatching { ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        }
-    }
-}
-
-/** Google 地圖時間軸：把最小寬度調成 640dp 再開時間軸（平板版面才有完整時間軸） */
-object TimelineDpi {
-    fun apply(ctx: Context, cb: (String) -> Unit) {
-        val s = FloatingService.screenSize(ctx)
-        val shortSide = min(s.x, s.y)
-        val density = shortSide * 160 / 640
-        App.bg {
-            val r = Shell.exec("wm density $density")
-            App.ui {
-                cb(if (r.ok) "已設定 density=$density（約 640dp）" else "失敗：$r")
-                if (r.ok) App.ui(900) { openTimeline(ctx) }
-            }
-        }
-    }
-
-    fun reset(cb: (String) -> Unit) {
-        App.bg {
-            val r = Shell.exec("wm density reset")
-            App.ui { cb(if (r.ok) "已還原原本的顯示大小" else "失敗：$r") }
-        }
-    }
-
-    fun openTimeline(ctx: Context) {
-        val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/timeline"))
-            .setPackage("com.google.android.apps.maps").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { ctx.startActivity(i) }.onFailure {
-            Toast.makeText(ctx, "找不到 Google 地圖", Toast.LENGTH_SHORT).show()
         }
     }
 }
