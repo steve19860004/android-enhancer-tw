@@ -33,9 +33,18 @@ object StrictMode {
 
     private const val ADB_WIFI = "adb_wifi_enabled"
 
+    // 手動一鍵隱身（和自動嚴格模式共用設定，但各自記狀態）
+    const val K_M_OFF_ADB = "t4_m_off_adb"      // 手動隱身時是否也關 ADB（預設否）
+    private const val K_M_ACTIVE = "rt_t4_m_active"
+    private const val K_M_A11Y = "rt_t4_m_a11y"
+    private const val K_M_ADB = "rt_t4_m_adb"
+    private const val K_M_WIFI = "rt_t4_m_wifi"
+    private const val K_M_DEV = "rt_t4_m_dev"
+
     @Volatile private var suppressUntil = 0L
 
     fun isActive() = Prefs.bool(K_ACTIVE)
+    fun manualActive() = Prefs.bool(K_M_ACTIVE)
 
     fun onForeground(ctx: Context, prev: String, pkg: String) {
         if (!Prefs.bool(K_ENABLED)) return
@@ -118,6 +127,62 @@ object StrictMode {
             .setOngoing(true)
             .build()
         runCatching { ctx.getSystemService(NotificationManager::class.java).notify(NOTIF_ID, n) }
+    }
+
+    /**
+     * 手動一鍵隱身：真的把所有無障礙服務關掉並記下來（可選一併關 ADB），
+     * 進銀行／超商 App 前按一次，出來再「恢復」。
+     * 用 WRITE_SECURE_SETTINGS 寫入，就算關了 ADB、Shizuku 斷線，之後仍能自己還原。
+     */
+    @Synchronized
+    fun manualHide(ctx: Context): Boolean {
+        if (!Perms.writeSecure(ctx) || manualActive()) return false
+        val cr = ctx.contentResolver
+        val a11y = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+        Prefs.put(K_M_A11Y, a11y)
+        val offAdb = Prefs.bool(K_M_OFF_ADB)
+        if (offAdb) {
+            Prefs.put(K_M_ADB, Settings.Global.getInt(cr, Settings.Global.ADB_ENABLED, 0))
+            Prefs.put(K_M_WIFI, Settings.Global.getInt(cr, ADB_WIFI, 0))
+            Prefs.put(K_M_DEV, Settings.Global.getInt(cr, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0))
+        }
+        Prefs.put(K_M_ACTIVE, true)
+        return runCatching {
+            // 真的停用全部無障礙（含本 App 自己的），不是偽裝
+            Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, "")
+            Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
+            if (offAdb) {
+                Settings.Global.putInt(cr, ADB_WIFI, 0)
+                Settings.Global.putInt(cr, Settings.Global.ADB_ENABLED, 0)
+                Settings.Global.putInt(cr, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0)
+            }
+        }.isSuccess
+    }
+
+    @Synchronized
+    fun manualRestore(ctx: Context): Boolean {
+        if (!manualActive()) return false
+        if (!Perms.writeSecure(ctx)) return false
+        val cr = ctx.contentResolver
+        runCatching {
+            val saved = Prefs.str(K_M_A11Y)
+            if (saved.isNotEmpty()) Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, saved)
+            Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, if (saved.isEmpty()) 0 else 1)
+            if (Prefs.has(K_M_ADB)) {
+                Settings.Global.putInt(cr, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, Prefs.int(K_M_DEV, 1))
+                Settings.Global.putInt(cr, Settings.Global.ADB_ENABLED, Prefs.int(K_M_ADB, 1))
+                Settings.Global.putInt(cr, ADB_WIFI, Prefs.int(K_M_WIFI, 0))
+            }
+        }
+        Prefs.put(K_M_ACTIVE, false)
+        listOf(K_M_ADB, K_M_WIFI, K_M_DEV).forEach { Prefs.remove(it) }
+        return true
+    }
+
+    fun manualStateText(ctx: Context): String {
+        if (!manualActive()) return "目前：環境正常（未隱身）"
+        val offAdb = Prefs.has(K_M_ADB)
+        return "🟢 已隱身：無障礙服務已暫停" + if (offAdb) "，ADB／開發者選項已關閉" else "，ADB 維持開啟"
     }
 
     fun stateText(ctx: Context): String {

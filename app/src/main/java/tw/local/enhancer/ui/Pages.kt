@@ -308,8 +308,28 @@ class Pages(private val act: MainActivity) {
     // =========================== Tab 4 ===========================
 
     fun strict(root: LinearLayout) = with(ui) {
-        requirements(root, Req.WRITE_SECURE, Req.A11Y)
-        card(root, "環境隱身（誠實版嚴格模式）") {
+        requirements(root, Req.WRITE_SECURE)
+        card(root, "一鍵隱身（手動開關）") {
+            hint("進銀行、支付或超商 App 前按一次「啟用隱身」，真的把所有無障礙服務暫停（可選一併關掉 ADB 與開發者選項）；出來後按「恢復」。不是偽裝數值，而是真的關掉，所以也會關掉本 App 自己的無障礙（捲動翻譯、自動點擊等），恢復後才會回來。")
+            text(StrictMode.manualStateText(act), bold = true)
+            if (!Perms.writeSecure(act)) {
+                status("寫入安全設定（Shizuku 授權一次）", false) { grantAll() }
+            } else if (!StrictMode.manualActive()) {
+                toggle("同時關閉 ADB 與開發者選項", StrictMode.K_M_OFF_ADB, false,
+                    "關掉 ADB 會讓 Shizuku 斷線；但還原是靠「寫入安全設定」權限，不需要 Shizuku，所以之後仍能一鍵恢復。")
+                button("啟用隱身", primary = true) {
+                    if (StrictMode.manualHide(act)) act.toast("已隱身，可以開啟銀行 App 了") else act.toast("失敗：需要寫入安全設定權限")
+                    act.render()
+                }
+            } else {
+                button("恢復環境（還原無障礙與 ADB）", primary = true) {
+                    if (StrictMode.manualRestore(act)) act.toast("已恢復") else act.toast("還原失敗")
+                    act.render()
+                }
+                hint("還原後，若本 App 的無障礙沒自動回來，可到設定頁重新開啟。")
+            }
+        }
+        card(root, "自動嚴格模式（進入指定 App 時自動隱身）") {
             hint("進入你勾選的 App（銀行、支付、超商等）時，自動「真的」關閉開發者選項、USB 偵錯與無線偵錯，離開或鎖屏後恢復原狀。不偽裝任何數值，只是幫你自動做原本要手動做的事。")
             text("⚠ 關閉偵錯會讓 Shizuku 中斷，離開後請重新啟動 Shizuku（Shizuku 13.5+ 可在其設定開啟「開機／連上 Wi-Fi 時自動啟動」）。", 13f, color = badColor)
             toggle("啟用嚴格模式", StrictMode.K_ENABLED)
