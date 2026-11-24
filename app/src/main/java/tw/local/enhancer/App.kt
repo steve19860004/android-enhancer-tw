@@ -25,6 +25,7 @@ class App : Application() {
         runCatching {
             rikka.shizuku.Shizuku.addBinderReceivedListenerSticky {
                 bg { if (Shell.ready()) PhotoGuard.restoreIfStale(this) }
+                if (Shell.ready()) tw.local.enhancer.feature.timeline.TimelineShizuku.onShizukuReady(this)
             }
         }
         // 上次若在守護中被殺掉，開啟時先把狀態還原，避免相簿一直斷網／ADB 一直關著

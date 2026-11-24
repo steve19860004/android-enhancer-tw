@@ -19,6 +19,7 @@ class BootReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }
+        tw.local.enhancer.feature.timeline.TimelineShizuku.scheduleDaily(ctx)
         if (Prefs.bool(FloatingService.K_ENABLED) && Perms.overlay(ctx)) {
             runCatching { FloatingService.start(ctx) }
         }

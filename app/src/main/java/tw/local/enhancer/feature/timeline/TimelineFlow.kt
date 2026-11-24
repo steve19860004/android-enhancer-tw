@@ -179,6 +179,7 @@ object TimelineFlow {
     /** 開機解鎖後自動執行（每次開機只試一次） */
     private fun check() {
         val s = svc ?: return
+        if (TimelineShizuku.isMode()) return
         if (!dailyCheck() && step.isEmpty() && unlocked(s) && !hasPending() && Prefs.bool(K_AUTO) &&
             boot(s) >= 0 && Prefs.int(K_ATTEMPT, -1) != boot(s)
         ) begin(false)
@@ -242,6 +243,7 @@ object TimelineFlow {
 
     private fun dailyCheck(): Boolean {
         val s = svc ?: return false
+        if (TimelineShizuku.isMode()) return false
         if (!Prefs.bool(K_DAILY) || step.isNotEmpty() || hasPending()) return false
         val now = LocalDateTime.now()
         if (!due(now, Prefs.long(K_DAILY_DAY, Long.MAX_VALUE), Prefs.int(K_DAILY_MIN, DAILY_DEFAULT))) return false

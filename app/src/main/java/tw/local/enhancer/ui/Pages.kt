@@ -31,6 +31,7 @@ import tw.local.enhancer.feature.tools.CircleSearch
 import tw.local.enhancer.feature.tools.ImeManager
 import tw.local.enhancer.feature.tools.PowerCamera
 import tw.local.enhancer.feature.timeline.TimelineFlow
+import tw.local.enhancer.feature.timeline.TimelineShizuku
 import tw.local.enhancer.feature.translate.Langs
 import tw.local.enhancer.feature.translate.ScrollTranslator
 import tw.local.enhancer.feature.voice.VoiceIntercept
@@ -446,8 +447,32 @@ class Pages(private val act: MainActivity) {
     // ---- 時間軸助手（移植自 Timeline-NoPair 0.26，免 Shizuku） ----
 
     private fun timeline(root: LinearLayout) = with(ui) {
+        val shz = TimelineShizuku.isMode()
         card(root, "Google 地圖時間軸（時間軸助手）") {
-            hint("免 root、免 Shizuku。自動把最小寬度改成 640 dp → 強制停止 Google 地圖與 Google Play 服務 → 還原並核對原始寬度。")
+            hint("把最小寬度暫時改成 640 dp → 強制停止 Google 地圖與 Google Play 服務 → 還原原本寬度。")
+            text("執行方式", bold = true)
+            radios(TimelineShizuku.K_MODE, "shizuku", listOf(
+                "shizuku" to "Shizuku（推薦）：直接下指令，不用無障礙、不會跳設定頁，幾秒就好",
+                "a11y" to "無障礙：不需 Shizuku，自動點設定頁（小米無法用 Shizuku 時用這個）"
+            )) { TimelineShizuku.scheduleDaily(act); act.render() }
+        }
+        if (shz) card(root, "Shizuku 執行") {
+            if (!Shell.ready()) status("Shizuku", false) { requestShizuku() }
+            val cur = text("讀取目前寬度中…", 13f, color = textSub)
+            App.bg { val t = TimelineShizuku.currentText(); App.ui { cur.text = t } }
+            hint("原始寬度會自動偵測並在結束時還原，不用手動記下。")
+            if (TimelineShizuku.hasPending()) text("⚠ 上次流程未完成，按「僅還原畫面大小」即可恢復", 13f, color = badColor)
+            button("開始執行", primary = true) {
+                if (!Shell.ready()) { requestShizuku(); return@button }
+                act.toast("執行中，約 15 秒…")
+                App.bg { val r = TimelineShizuku.run(act); App.ui { act.toast(r); act.render() } }
+            }
+            button("僅還原畫面大小") {
+                App.bg { val r = TimelineShizuku.run(act, restoreOnly = true); App.ui { act.toast(r); act.render() } }
+            }
+            seek(TimelineShizuku.K_HOLD, 3, 30, 8, { "停止後在 640 dp 停留：$it 秒" })
+            hint("讓 Google Play 服務在平板寬度下重新啟動。無效時可以加長。")
+        } else card(root, "無障礙執行") {
             if (!Perms.a11y(act)) status("無障礙服務", false) { Perms.openA11y(act) }
             text("首次設定：請先在開發人員選項查看並截圖保存原本的「最小寬度」。第一次先別修改，返回這裡記下原值。", 13.5f)
             button("開啟開發人員選項／查看原值") { openDev() }
@@ -457,42 +482,46 @@ class Pages(private val act: MainActivity) {
             if (TimelineFlow.hasPending()) {
                 text("⚠ 上次流程未完成，待還原寬度 ${TimelineFlow.pendingWidth()} dp", 13f, color = badColor)
             }
-        }
-        card(root, "自動執行") {
-            hint("先保存原寬度並開啟無障礙服務，再按「開始自動測試」。請在出發前測試。若設定頁沒有自動定位，請手動滑到最小寬度。")
+            hint("若設定頁沒有自動定位，請手動滑到最小寬度。")
             button("開始自動測試", primary = true) { TimelineFlow.runManual(act, false) }
             button("僅還原畫面大小") { TimelineFlow.runManual(act, true) }
-            val auto = toggle("每次開機解鎖後自動執行", TimelineFlow.K_AUTO)
+        }
+        card(root, "自動執行") {
+            val auto = toggle("每次開機後自動執行", TimelineFlow.K_AUTO)
             auto.setOnCheckedChangeListener { b, on ->
                 if (on && !Prefs.bool(TimelineFlow.K_TESTED)) {
                     b.isChecked = false
-                    act.toast("請先讓「開始自動測試」成功跑完一次")
+                    act.toast("請先成功執行一次")
                 } else Prefs.put(TimelineFlow.K_AUTO, on)
             }
+            if (shz) hint("Shizuku 模式：開機後 Shizuku 啟動（可在 Shizuku 設定開機自動啟動）才會執行。")
             val daily = toggle("每日自動執行", TimelineFlow.K_DAILY)
             val timeBtn = button(TimelineFlow.dailyLabel(Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT))) { }
             daily.setOnCheckedChangeListener { b, on ->
-                if (on && Prefs.int(TimelineFlow.K_WIDTH, -1) <= 0) {
+                if (on && !shz && Prefs.int(TimelineFlow.K_WIDTH, -1) <= 0) {
                     b.isChecked = false
                     act.toast("請先記下並保存原始寬度")
-                } else TimelineFlow.setDaily(on, Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT))
+                } else {
+                    TimelineFlow.setDaily(on, Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT))
+                    TimelineShizuku.scheduleDaily(act)
+                }
             }
             timeBtn.setOnClickListener {
                 val m = Prefs.int(TimelineFlow.K_DAILY_MIN, TimelineFlow.DAILY_DEFAULT)
                 android.app.TimePickerDialog(act, { _, hh, mm ->
                     val v = hh * 60 + mm
                     TimelineFlow.setDaily(daily.isChecked, v)
+                    TimelineShizuku.scheduleDaily(act)
                     timeBtn.text = TimelineFlow.dailyLabel(v)
                 }, m / 60, m % 60, true).show()
             }
-            hint("依手機當地時間執行。鎖定或熄屏時，會等到亮屏並解鎖後再執行。請避開導航時段。")
+            hint(if (shz) "依手機當地時間執行，熄屏也會執行。請避開導航時段。"
+                else "依手機當地時間執行。鎖定或熄屏時，會等到亮屏並解鎖後再執行。請避開導航時段。")
             text("狀態", bold = true)
-            act.timelineStatus = text(Prefs.str(TimelineFlow.K_STATUS, "尚未測試"), 13f, color = textSub)
+            act.timelineStatus = text(Prefs.str(TimelineFlow.K_STATUS, "尚未執行"), 13f, color = textSub)
         }
         card(root, "手動操作") {
-            button("1　開啟設定頁，自行調成 640 dp") {
-                if (Prefs.int(TimelineFlow.K_WIDTH, -1) <= 0) act.toast("請先記下原本的最小寬度") else openDev()
-            }
+            button("1　開啟設定頁，自行調成 640 dp") { openDev() }
             button("2　開啟 Google 地圖資訊") { appDetails("com.google.android.apps.maps") }
             button("3　開啟 Google Play 服務資訊") { appDetails("com.google.android.gms") }
             hint("在上述兩個資訊頁分別點「強制停止」並確認。若系統不允許停止，請還原寬度並結束。")
