@@ -26,6 +26,9 @@ object VoiceIntercept {
     val CN_ASSISTANTS = linkedMapOf(
         "com.vivo.agent" to "vivo Jovi／藍心小V",
         "com.vivo.aiagent" to "vivo 藍心小V（新版）",
+        "com.vivo.ai.copilot" to "vivo 藍心小V（OriginOS 5+）",
+        "com.vivo.assistant" to "vivo 智慧助理",
+        "com.vivo.voicewakeup" to "vivo 語音喚醒",
         "com.miui.voiceassist" to "小米 小愛同學",
         "com.xiaomi.aiasst.service" to "小米 AI 助理",
         "com.heytap.speechassist" to "OPPO／一加 小布助理",
@@ -40,12 +43,40 @@ object VoiceIntercept {
 
     private var lastFire = 0L
 
+    // ---- 抓取模式：記下這段時間出現過的所有視窗套件，用來找出本機助理的真正套件名 ----
+    private const val K_CAPTURED = "rt_t3_captured"
+    @Volatile private var captureUntil = 0L
+    private val captured = LinkedHashSet<String>()
+
+    fun startCapture(seconds: Int = 15) {
+        synchronized(captured) { captured.clear() }
+        Prefs.remove(K_CAPTURED)
+        captureUntil = System.currentTimeMillis() + seconds * 1000L
+    }
+
+    fun capturing() = System.currentTimeMillis() < captureUntil
+
+    fun capturedList(): List<String> = Prefs.str(K_CAPTURED).split(',').filter { it.isNotBlank() }
+
+    /** 服務收到任何事件時呼叫 */
+    fun onAnyPackage(ctx: Context, pkg: String) {
+        if (!capturing()) return
+        if (pkg == ctx.packageName || pkg == "com.android.systemui" || pkg == "android") return
+        synchronized(captured) {
+            if (captured.add(pkg)) Prefs.put(K_CAPTURED, captured.joinToString(","))
+        }
+    }
+
+    fun isTarget(pkg: String) = pkg in CN_ASSISTANTS.keys || pkg in Prefs.set(K_EXTRA)
+
+    fun enabled() = Prefs.bool(K_ENABLED)
+
     fun targets(ctx: Context): List<String> =
         (CN_ASSISTANTS.keys + Prefs.set(K_EXTRA)).filter { Apps.installed(ctx, it) }
 
     fun onWindow(svc: AccessibilityService, pkg: String, cls: String?) {
         if (!Prefs.bool(K_ENABLED)) return
-        if (pkg !in CN_ASSISTANTS.keys && pkg !in Prefs.set(K_EXTRA)) return
+        if (!isTarget(pkg)) return
         val now = System.currentTimeMillis()
         if (now - lastFire < 2500) return
         lastFire = now

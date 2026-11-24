@@ -260,6 +260,37 @@ class Pages(private val act: MainActivity) {
             button("選擇預設數位助理（請設為 Gemini）") { VoiceIntercept.openDefaultAssistantSettings(act) }
             button("手動測試叫出目標", primary = true) { VoiceIntercept.launchTarget(act) }
         }
+        card(root, "攔不到？抓取本機助理的套件名") {
+            hint("按下後 15 秒內，請用平常的方式（長按電源鍵等）叫出小V，再回到這裡。會列出這段時間出現過的 App，點「加入攔截」即可。")
+            button(if (VoiceIntercept.capturing()) "抓取中…（叫出小V後回來）" else "開始抓取（15 秒）", primary = true) {
+                if (!Perms.a11y(act)) { Perms.openA11y(act); return@button }
+                VoiceIntercept.startCapture(15)
+                act.toast("請現在叫出小V")
+                act.moveTaskToBack(true)
+            }
+            val got = VoiceIntercept.capturedList()
+            if (got.isNotEmpty()) {
+                text("抓到的套件：", bold = true)
+                for (p in got) {
+                    val row = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                    row.addView(TextView(act).apply {
+                        text = Apps.label(act, p) + "\n" + p
+                        setTextColor(textMain); textSize = 13f
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    val added = VoiceIntercept.isTarget(p)
+                    row.addView(TextView(act).apply {
+                        text = if (added) "已攔截" else "加入攔截"
+                        setTextColor(if (added) okColor else accent); textSize = 13.5f
+                        setPadding(dp(12), dp(8), dp(4), dp(8))
+                        if (!added) setOnClickListener {
+                            Prefs.put(VoiceIntercept.K_EXTRA, Prefs.set(VoiceIntercept.K_EXTRA) + p)
+                            act.toast("已加入：" + Apps.label(act, p)); act.render()
+                        }
+                    })
+                    addView(row)
+                }
+            }
+        }
         card(root, "進階") {
             val extra = Prefs.set(VoiceIntercept.K_EXTRA)
             hint("如果你的手機助理不在內建清單，可以手動加入它的套件。已加入：${extra.size} 個")
