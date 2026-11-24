@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Android補強工具箱</string>
+    <string name="a11y_desc">偵測前景 App 切換，用於最近任務切換器、相簿守護、語音攔截、嚴格模式與穿透式翻譯。畫面內容只在本機即時處理，不儲存也不上傳。</string>
+</resources>

@@ -1,0 +1,101 @@
+package tw.local.enhancer.core
+
+import android.content.pm.PackageManager
+import rikka.shizuku.Shizuku
+import java.io.InputStream
+import java.util.concurrent.TimeUnit
+
+/** Shizuku 包裝：以 adb shell 身分執行指令（免 root）。 */
+object Shell {
+    data class Result(val code: Int, val out: String, val err: String) {
+        val ok get() = code == 0
+        override fun toString() = (out + (if (err.isNotBlank()) "\n" + err else "")).trim()
+    }
+
+    const val REQ_CODE = 7001
+    private val listeners = mutableListOf<(Boolean) -> Unit>()
+
+    private val permListener = Shizuku.OnRequestPermissionResultListener { code, result ->
+        if (code == REQ_CODE) {
+            val granted = result == PackageManager.PERMISSION_GRANTED
+            listeners.toList().forEach { it(granted) }
+            listeners.clear()
+        }
+    }
+
+    fun init() {
+        runCatching { Shizuku.addRequestPermissionResultListener(permListener) }
+    }
+
+    /** Shizuku 服務是否在跑 */
+    fun running(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+
+    /** Shizuku 已在跑且已授權本 App */
+    fun ready(): Boolean = running() && runCatching {
+        !Shizuku.isPreV11() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+    }.getOrDefault(false)
+
+    fun statusText(): String = when {
+        !running() -> "Shizuku 狀態：未連線（請先開啟 Shizuku App 並啟動服務）"
+        !ready() -> "Shizuku 狀態：已連線（尚未授權本 App）"
+        else -> "Shizuku 狀態：已連線並授權"
+    }
+
+    fun request(cb: (Boolean) -> Unit) {
+        if (!running()) { cb(false); return }
+        if (ready()) { cb(true); return }
+        listeners.add(cb)
+        runCatching { Shizuku.requestPermission(REQ_CODE) }.onFailure { listeners.remove(cb); cb(false) }
+    }
+
+    private fun newProcess(cmd: String): Process {
+        // Shizuku API 13 將 newProcess 設為 private，官方建議用 UserService；這裡用反射呼叫最簡單
+        val m = Shizuku::class.java.getDeclaredMethod(
+            "newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java
+        )
+        m.isAccessible = true
+        return m.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
+    }
+
+    /** 同步執行（請在背景執行緒呼叫） */
+    fun exec(cmd: String, timeoutSec: Long = 20): Result {
+        if (!ready()) return Result(-1, "", "Shizuku 未連線或未授權")
+        return try {
+            val p = newProcess(cmd)
+            val out = StringBuilder()
+            val err = StringBuilder()
+            val t1 = Thread { runCatching { out.append(p.inputStream.bufferedReader().readText()) } }
+            val t2 = Thread { runCatching { err.append(p.errorStream.bufferedReader().readText()) } }
+            t1.start(); t2.start()
+            val done = p.waitFor(timeoutSec, TimeUnit.SECONDS)
+            if (!done) p.destroy()
+            t1.join(1000); t2.join(1000)
+            Result(if (done) p.exitValue() else -2, out.toString().trim(), err.toString().trim())
+        } catch (e: Throwable) {
+            Result(-1, "", e.toString())
+        }
+    }
+
+    /** 把資料串流餵給指令的 stdin（用於 pm install -S） */
+    fun execWithStdin(cmd: String, input: InputStream, timeoutSec: Long = 180): Result {
+        if (!ready()) return Result(-1, "", "Shizuku 未連線或未授權")
+        return try {
+            val p = newProcess(cmd)
+            val out = StringBuilder()
+            val err = StringBuilder()
+            val t1 = Thread { runCatching { out.append(p.inputStream.bufferedReader().readText()) } }
+            val t2 = Thread { runCatching { err.append(p.errorStream.bufferedReader().readText()) } }
+            t1.start(); t2.start()
+            p.outputStream.use { os -> input.use { it.copyTo(os, 64 * 1024) } }
+            val done = p.waitFor(timeoutSec, TimeUnit.SECONDS)
+            if (!done) p.destroy()
+            t1.join(1000); t2.join(1000)
+            Result(if (done) p.exitValue() else -2, out.toString().trim(), err.toString().trim())
+        } catch (e: Throwable) {
+            Result(-1, "", e.toString())
+        }
+    }
+
+    /** 單引號跳脫，避免套件名等參數被 shell 解讀 */
+    fun q(s: String) = "'" + s.replace("'", "'\\''") + "'"
+}
