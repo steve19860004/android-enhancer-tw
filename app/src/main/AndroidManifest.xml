@@ -117,6 +117,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".feature.timeline.TimelineShizuku$DailyReceiver"
+            android:exported="false" />
+
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

@@ -25,6 +25,7 @@ object Prefs {
     /** 同步寫入（流程中途斷電／被殺也不會遺失），回傳是否成功 */
     fun putNow(k: String, v: Int): Boolean = sp.edit().putInt(k, v).commit()
     fun putNow(k: String, v: Long): Boolean = sp.edit().putLong(k, v).commit()
+    fun putNowStr(k: String, v: String): Boolean = sp.edit().putString(k, v).commit()
     fun removeNow(k: String): Boolean = sp.edit().remove(k).commit()
     fun listen(l: SharedPreferences.OnSharedPreferenceChangeListener) = sp.registerOnSharedPreferenceChangeListener(l)
     fun unlisten(l: SharedPreferences.OnSharedPreferenceChangeListener) = sp.unregisterOnSharedPreferenceChangeListener(l)
