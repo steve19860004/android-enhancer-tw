@@ -59,7 +59,21 @@ object VoiceIntercept {
     fun capturedList(): List<String> = Prefs.str(K_CAPTURED).split(',').filter { it.isNotBlank() }
 
     /** 服務收到任何事件時呼叫 */
+    // ---- 延遲攔截：保留「繼續按住叫出重開機選單」 ----
+    const val K_DELAY = "t3_delay_ds"   // 單位 0.1 秒
+    const val K_POWER_MENU = "t3_power_menu_pkgs"
+    val DEFAULT_POWER_MENU = setOf("com.vivo.systemuiplugin")
+    private var pending: Runnable? = null
+
+    fun powerMenuPkgs(): Set<String> =
+        if (Prefs.has(K_POWER_MENU)) Prefs.set(K_POWER_MENU) else DEFAULT_POWER_MENU
+
     fun onAnyPackage(ctx: Context, pkg: String) {
+        // 等待期間跳出重開機／關機選單 → 使用者是要重開機，取消攔截
+        if (pending != null && pkg in powerMenuPkgs()) {
+            pending?.let { App.main.removeCallbacks(it) }
+            pending = null
+        }
         if (!capturing()) return
         if (pkg == ctx.packageName || pkg == "com.android.systemui" || pkg == "android") return
         synchronized(captured) {
@@ -77,10 +91,18 @@ object VoiceIntercept {
     fun onWindow(svc: AccessibilityService, pkg: String, cls: String?) {
         if (!Prefs.bool(K_ENABLED)) return
         if (!isTarget(pkg)) return
+        if (pending != null) return
         val now = System.currentTimeMillis()
         if (now - lastFire < 2500) return
-        lastFire = now
-        intercept(svc, pkg)
+        val delay = Prefs.int(K_DELAY, 25) * 100L
+        if (delay <= 0) { lastFire = now; intercept(svc, pkg); return }
+        val r = Runnable {
+            pending = null
+            lastFire = System.currentTimeMillis()
+            intercept(svc, pkg)
+        }
+        pending = r
+        App.main.postDelayed(r, delay)
     }
 
     private fun intercept(svc: AccessibilityService, pkg: String) {
