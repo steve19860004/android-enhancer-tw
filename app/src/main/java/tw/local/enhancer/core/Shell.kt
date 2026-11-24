@@ -3,7 +3,6 @@ package tw.local.enhancer.core
 import android.content.pm.PackageManager
 import rikka.shizuku.Shizuku
 import java.io.InputStream
-import java.util.concurrent.TimeUnit
 
 /** Shizuku 包裝：以 adb shell 身分執行指令（免 root）。 */
 object Shell {
@@ -57,6 +56,24 @@ object Shell {
         return m.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
     }
 
+    /**
+     * 等待程序結束。不能用 Process.waitFor(timeout, unit)：它的預設實作靠 exitValue() 丟
+     * IllegalThreadStateException 判斷「還在跑」，但 Shizuku 遠端程序跨 binder 丟的是別種例外，
+     * 會導致每個指令都被當成失敗。改用阻塞的 waitFor() 放在另一條執行緒，逾時就砍掉。
+     * 回傳結束碼；逾時回傳 null。
+     */
+    private fun waitExit(p: Process, timeoutSec: Long): Int? {
+        var code: Int? = null
+        val t = Thread { code = runCatching { p.waitFor() }.getOrNull() }
+        t.start()
+        t.join(timeoutSec * 1000)
+        if (t.isAlive) {
+            runCatching { p.destroy() }
+            return null
+        }
+        return code
+    }
+
     /** 同步執行（請在背景執行緒呼叫） */
     fun exec(cmd: String, timeoutSec: Long = 20): Result {
         if (!ready()) return Result(-1, "", "Shizuku 未連線或未授權")
@@ -67,10 +84,9 @@ object Shell {
             val t1 = Thread { runCatching { out.append(p.inputStream.bufferedReader().readText()) } }
             val t2 = Thread { runCatching { err.append(p.errorStream.bufferedReader().readText()) } }
             t1.start(); t2.start()
-            val done = p.waitFor(timeoutSec, TimeUnit.SECONDS)
-            if (!done) p.destroy()
-            t1.join(1000); t2.join(1000)
-            Result(if (done) p.exitValue() else -2, out.toString().trim(), err.toString().trim())
+            val code = waitExit(p, timeoutSec)
+            t1.join(2000); t2.join(2000)
+            Result(code ?: -2, out.toString().trim(), err.toString().trim().ifEmpty { if (code == null) "逾時" else "" })
         } catch (e: Throwable) {
             Result(-1, "", e.toString())
         }
@@ -87,10 +103,9 @@ object Shell {
             val t2 = Thread { runCatching { err.append(p.errorStream.bufferedReader().readText()) } }
             t1.start(); t2.start()
             p.outputStream.use { os -> input.use { it.copyTo(os, 64 * 1024) } }
-            val done = p.waitFor(timeoutSec, TimeUnit.SECONDS)
-            if (!done) p.destroy()
-            t1.join(1000); t2.join(1000)
-            Result(if (done) p.exitValue() else -2, out.toString().trim(), err.toString().trim())
+            val code = waitExit(p, timeoutSec)
+            t1.join(2000); t2.join(2000)
+            Result(code ?: -2, out.toString().trim(), err.toString().trim().ifEmpty { if (code == null) "逾時" else "" })
         } catch (e: Throwable) {
             Result(-1, "", e.toString())
         }
