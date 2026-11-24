@@ -35,7 +35,7 @@ object Shell {
     }.getOrDefault(false)
 
     fun statusText(): String = when {
-        !running() -> "Shizuku 狀態：未連線（請先開啟 Shizuku App 並啟動服務）"
+        !running() -> "Shizuku 狀態：未連線（請啟動 Shizuku 服務；建議用 Shizuku-Next 可開機自動啟動）"
         !ready() -> "Shizuku 狀態：已連線（尚未授權本 App）"
         else -> "Shizuku 狀態：已連線並授權"
     }
