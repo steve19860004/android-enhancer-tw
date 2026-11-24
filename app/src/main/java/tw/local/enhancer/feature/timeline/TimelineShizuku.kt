@@ -165,7 +165,12 @@ object TimelineShizuku {
             val pending = goAsync()
             App.bg {
                 try {
-                    if (isMode() && Prefs.bool(TimelineFlow.K_DAILY)) run(ctx)
+                    if (isMode() && Prefs.bool(TimelineFlow.K_DAILY)) {
+                        // 鬧鐘把 App 叫醒時，Shizuku 連線要一點時間才會送到，最多等 20 秒
+                        var waited = 0
+                        while (!Shell.ready() && waited < 20000) { Thread.sleep(500); waited += 500 }
+                        if (Shell.ready()) run(ctx) else msg("每日執行略過：Shizuku 未啟動")
+                    }
                 } finally {
                     scheduleDaily(ctx)   // 排下一次
                     pending.finish()
