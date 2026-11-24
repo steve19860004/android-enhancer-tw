@@ -55,7 +55,12 @@ class EnhancerA11yService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        // 浮層型助理有時只送「視窗清單變動」且沒有套件名，要自己掃一次視窗
+        if (e.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED &&
+            (VoiceIntercept.enabled() || VoiceIntercept.capturing())
+        ) scanWindows()
         val pkg = e.packageName?.toString() ?: return
+        VoiceIntercept.onAnyPackage(this, pkg)
         if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val cls = e.className?.toString()
             // 語音助理多半是浮層而不是 Activity，所以吃原始事件
@@ -67,6 +72,18 @@ class EnhancerA11yService : AccessibilityService() {
             }
         }
         ScrollTranslator.onEvent(this, e)
+    }
+
+    private fun scanWindows() {
+        val ws = runCatching { windows }.getOrNull() ?: return
+        for (w in ws) {
+            val p = runCatching { w.root?.packageName?.toString() }.getOrNull() ?: continue
+            VoiceIntercept.onAnyPackage(this, p)
+            if (VoiceIntercept.isTarget(p)) {
+                VoiceIntercept.onWindow(this, p, null)
+                break
+            }
+        }
     }
 
     private fun onForeground(prev: String, pkg: String) {
