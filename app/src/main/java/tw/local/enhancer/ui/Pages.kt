@@ -245,6 +245,8 @@ class Pages(private val act: MainActivity) {
                 13f, color = textSub)
             toggle("啟用語音助理攔截", VoiceIntercept.K_ENABLED)
             toggle("攔截時震動回饋", VoiceIntercept.K_VIBRATE, true)
+            seek(VoiceIntercept.K_DELAY, 0, 50, 25, { "小V出現後等待：%.1f 秒".format(it / 10f) })
+            hint("等待期間若跳出重開機選單（繼續按住電源鍵），就不攔截，可照常重開機。重開機選單約按住 2–3 秒出現；等待越短，Gemini 越快出來，但越可能擋到重開機選單。設 0 秒＝立刻攔截。")
         }
         card(root, "攔截後要叫出") {
             radios(VoiceIntercept.K_TARGET, "overlay", listOf(
