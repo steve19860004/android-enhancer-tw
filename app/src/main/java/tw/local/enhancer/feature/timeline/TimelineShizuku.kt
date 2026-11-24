@@ -41,9 +41,15 @@ object TimelineShizuku {
 
     private data class Disp(val physical: Int, val override: Int?, val shortPx: Int)
 
+    /** 最近一次讀取失敗時的原始輸出，顯示給使用者診斷 */
+    private var lastRaw = ""
+
     private fun read(): Disp? {
-        val d = Shell.exec("wm density").out
-        val s = Shell.exec("wm size").out
+        val dr = Shell.exec("wm density")
+        val sr = Shell.exec("wm size")
+        lastRaw = "wm density → [${dr.code}] $dr｜wm size → [${sr.code}] $sr".take(300)
+        val d = dr.out + "\n" + dr.err
+        val s = sr.out + "\n" + sr.err
         fun num(text: String, key: String) = Regex("$key\\s*density:\\s*(\\d+)", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)?.toInt()
         val phys = num(d, "Physical") ?: return null
         val over = num(d, "Override")
@@ -57,7 +63,7 @@ object TimelineShizuku {
     /** 目前最小寬度（給畫面顯示），背景執行緒呼叫 */
     fun currentText(): String {
         if (!Shell.ready()) return "Shizuku 未連線，無法讀取目前寬度"
-        val d = read() ?: return "讀不到顯示設定"
+        val d = read() ?: return "讀不到顯示設定：$lastRaw"
         return "目前最小寬度約 ${swOf(d)} dp（density ${d.override ?: d.physical}" +
             (if (d.override != null) "，已自訂；原廠 ${d.physical}" else "，原廠值") + "）"
     }
@@ -75,7 +81,7 @@ object TimelineShizuku {
                 val r = restore()
                 if (restoreOnly || r.isNotEmpty()) return (r.ifEmpty { "沒有待還原的寬度" }).also { msg(it) }
             }
-            val d = read() ?: return "讀不到顯示設定（wm density）".also { msg(it) }
+            val d = read() ?: return "讀不到顯示設定：$lastRaw".also { msg(it) }
             if (abs(swOf(d) - 640) <= 2) return "目前已經是 640 dp，請先還原原本的大小".also { msg(it) }
             if (!Installed.ok(ctx, GMS)) return "找不到 Google Play 服務".also { msg(it) }
 
