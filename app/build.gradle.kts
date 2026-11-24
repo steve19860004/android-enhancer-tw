@@ -13,6 +13,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+        // 只打包 64 位元 ARM（近年手機都是），APK 從約 120MB 降到約 45MB；原版也只有 arm64
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     signingConfigs {
