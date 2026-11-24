@@ -33,6 +33,7 @@ class MainActivity : Activity() {
         const val REQ_EXPORT = 101
         const val REQ_IMPORT = 102
         const val REQ_APK = 103
+        const val REQ_EXPORT_APK = 104
         private const val K_TAB = "ui_tab"
         /** 目前有焦點的主畫面（時間軸流程從前景 Activity 開設定頁較不會被擋） */
         @Volatile var focused: MainActivity? = null
@@ -58,7 +59,7 @@ class MainActivity : Activity() {
 
     val tabs = listOf(
         "sw" to "切換器", "t1" to "1 來電音樂", "t2" to "2 相簿守護", "t3" to "3 語音攔截",
-        "t4" to "4 環境隱身", "t5" to "5 捲動翻譯", "t6" to "6 工具", "set" to "⚙ 設定"
+        "t4" to "4 環境隱身", "t5" to "5 捲動翻譯", "t6" to "6 工具", "sys" to "7 系統", "ac" to "8 自動點擊", "set" to "⚙ 設定"
     )
 
     lateinit var ui: Ui
@@ -67,6 +68,7 @@ class MainActivity : Activity() {
     private lateinit var subtitle: TextView
     private lateinit var scroll: ScrollView
     private lateinit var pages: Pages
+    private lateinit var sysPages: SysPages
 
     var installLog: ((String) -> Unit)? = null
 
@@ -75,6 +77,7 @@ class MainActivity : Activity() {
         actionBar?.hide()  // 用自己畫的標題，不要系統標題列（避免重複）
         ui = Ui(this)
         pages = Pages(this)
+        sysPages = SysPages(this, pages)
         window.statusBarColor = ui.pageBg
         window.navigationBarColor = ui.pageBg
 
@@ -158,6 +161,8 @@ class MainActivity : Activity() {
             "t4" -> pages.strict(content)
             "t5" -> pages.translate(content)
             "t6" -> pages.tools(content)
+            "sys" -> sysPages.system(content)
+            "ac" -> sysPages.clicker(content)
             else -> pages.settings(content)
         }
     }
@@ -181,6 +186,16 @@ class MainActivity : Activity() {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
             .setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream"))
         startActivityForResult(i, REQ_IMPORT)
+    }
+
+    private var exportPkg: String? = null
+
+    fun exportApk(pkg: String) {
+        exportPkg = pkg
+        val name = runCatching { tw.local.enhancer.feature.sys.SysTools.exportName(this, pkg) }.getOrDefault("$pkg.apk")
+        val i = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/octet-stream").putExtra(Intent.EXTRA_TITLE, name)
+        startActivityForResult(i, REQ_EXPORT_APK)
     }
 
     fun pickApk(log: (String) -> Unit) {
@@ -217,6 +232,14 @@ class MainActivity : Activity() {
                         FloatingService.refresh(this)
                         render()
                     }.onFailure { toast("還原失敗：" + (it.message ?: "")) }
+                }
+            }
+            REQ_EXPORT_APK -> {
+                val pkg = exportPkg ?: return
+                toast("匯出中…")
+                App.bg {
+                    val r = runCatching { tw.local.enhancer.feature.sys.SysTools.exportTo(this, pkg, uri) }
+                    App.ui { toast(r.getOrElse { "匯出失敗：" + it.message }) }
                 }
             }
             REQ_APK -> {

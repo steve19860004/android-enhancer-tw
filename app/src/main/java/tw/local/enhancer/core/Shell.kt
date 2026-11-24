@@ -111,6 +111,63 @@ object Shell {
         }
     }
 
+    /** 讀取指令的原始二進位輸出（例如 screencap -p） */
+    fun execBytes(cmd: String, timeoutSec: Long = 10): ByteArray? {
+        if (!ready()) return null
+        return try {
+            val p = newProcess(cmd)
+            var bytes: ByteArray? = null
+            val t = Thread { bytes = runCatching { p.inputStream.readBytes() }.getOrNull() }
+            t.start()
+            t.join(timeoutSec * 1000)
+            if (t.isAlive) runCatching { p.destroy() }
+            bytes
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * 常駐的 Shizuku shell：連續送指令不用每次開新程序。
+     * run() 會等指令跑完（用結尾標記同步）。
+     */
+    class Session {
+        private var p: Process? = null
+        private var w: java.io.Writer? = null
+        private var r: java.io.BufferedReader? = null
+
+        @Synchronized
+        fun run(cmd: String, timeoutMs: Long = 5000): Boolean {
+            if (p == null) {
+                if (!ready()) return false
+                val np = newProcess("sh")
+                p = np
+                w = np.outputStream.bufferedWriter()
+                r = np.inputStream.bufferedReader()
+            }
+            return try {
+                val mark = "__done_${System.nanoTime()}__"
+                w!!.write("$cmd >/dev/null 2>&1; echo $mark\n")
+                w!!.flush()
+                val deadline = System.currentTimeMillis() + timeoutMs
+                while (System.currentTimeMillis() < deadline) {
+                    val line = r!!.readLine() ?: break
+                    if (line.trim() == mark) return true
+                }
+                close(); false
+            } catch (e: Throwable) {
+                close(); false
+            }
+        }
+
+        @Synchronized
+        fun close() {
+            runCatching { w?.close() }
+            runCatching { p?.destroy() }
+            p = null; w = null; r = null
+        }
+    }
+
     /** 單引號跳脫，避免套件名等參數被 shell 解讀 */
     fun q(s: String) = "'" + s.replace("'", "'\\''") + "'"
 }
