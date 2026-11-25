@@ -77,6 +77,7 @@ class CallMusicListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        runCatching { tw.local.enhancer.feature.msglog.MsgLog.onNotification(sbn) }
         if (!Prefs.bool(K_ENABLED)) return
         if (sbn.packageName !in commApps()) return
         if (!isCallNotification(sbn.notification)) return
