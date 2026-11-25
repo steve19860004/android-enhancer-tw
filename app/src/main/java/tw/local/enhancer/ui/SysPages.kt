@@ -27,6 +27,8 @@ import tw.local.enhancer.feature.clicker.Script
 import tw.local.enhancer.feature.clicker.Scripts
 import tw.local.enhancer.feature.sys.SysTools
 import tw.local.enhancer.feature.volume.VolumeBooster
+import tw.local.enhancer.feature.mock.MockLocation
+import tw.local.enhancer.feature.msglog.MsgLog
 
 /** Tab 7 系統工具、Tab 8 自動點擊 */
 class SysPages(private val act: MainActivity, private val pages: Pages) {
@@ -65,6 +67,26 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 AppPicker.show(act, "選擇要匯出 APK 的 App", emptySet(), multi = false, includeSystem = true) { sel ->
                     sel.firstOrNull()?.let { act.exportApk(it) }
                 }
+            }
+        }
+        card(root, "強制全 App 分割畫面／小窗") {
+            hint("開啟後，原本被廠商限制不給分割畫面或自由視窗的 App 也能用。需寫入安全設定或 Shizuku；部分設定重開機後才完全生效。")
+            val on = SysTools.freeformOn(act)
+            text(if (on) "狀態：已開啟" else "狀態：關閉", bold = true)
+            button(if (on) "關閉" else "開啟強制分割畫面／小窗", primary = !on) {
+                if (!SysTools.setFreeform(act, !on)) act.toast("需要寫入安全設定或 Shizuku") else act.toast("已" + if (!on) "開啟（建議重開機）" else "關閉")
+                act.render()
+            }
+        }
+        card(root, "全域強制深色模式") {
+            hint("把不支援深色的 App 也套上深色（開發者選項的 Override force-dark）。需 Shizuku。部分 App 會自己擋掉；force-dark 重開機會失效，本 App 會在開機後自動重套。")
+            if (!Shell.ready()) status("Shizuku", false) { pages.requestShizuku() }
+            val on = SysTools.darkOn()
+            text(if (on) "狀態：已開啟" else "狀態：關閉", bold = true)
+            button(if (on) "關閉全域深色" else "開啟全域深色", primary = !on) {
+                if (!Shell.ready()) { pages.requestShizuku(); return@button }
+                if (!SysTools.setDark(!on)) act.toast("失敗") else act.toast("已" + (if (!on) "開啟（部分 App 需重啟才變色）" else "關閉"))
+                act.render()
             }
         }
         card(root, "動畫速度") {
@@ -362,4 +384,90 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
             }
             .setNegativeButton("取消") { _, _ -> act.render() }.show()
     }
+
+    // =========================== Tab 10 救回收回訊息 ===========================
+
+    fun msgLog(root: LinearLayout) = with(ui) {
+        if (!Perms.listener(act)) card(root, "需要通知讀取權限") {
+            hint("靠通知記錄保存訊息，對方收回／刪除後你這邊還看得到。請開啟通知讀取權限。")
+            status("通知讀取權限", false) { Perms.openListener(act) }
+        }
+        card(root, "救回收回訊息") {
+            hint("會記錄下方勾選 App 的通知訊息，存在本機、不上傳。對方一收回，你這邊的紀錄還在。")
+            text("⚠ 僅供個人備查，請勿用於騷擾或散布他人訊息。", 12.5f, color = badColor)
+            toggle("啟用訊息記錄", MsgLog.K_ENABLED)
+            val apps = MsgLog.apps().filter { Apps.installed(act, it) }
+            hint("記錄的 App：" + (if (apps.isEmpty()) "（未安裝勾選的 App）" else apps.joinToString("、") { Apps.label(act, it) }))
+            button("選擇要記錄的 App") {
+                AppPicker.show(act, "記錄哪些 App 的訊息", MsgLog.apps(), extra = MsgLog.DEFAULT_APPS.toList()) {
+                    Prefs.put(MsgLog.K_APPS, it); act.render()
+                }
+            }
+        }
+        card(root, "訊息紀錄") {
+            val search = android.widget.EditText(act).apply { hint = "搜尋訊息或對方名稱…"; isSingleLine = true }
+            addView(search)
+            val box = ui.vbox()
+            addView(box)
+            fun refresh() {
+                box.removeAllViews()
+                val list = MsgLog.entries(query = search.text.toString().trim()).take(100)
+                if (list.isEmpty()) { box.hint("還沒有紀錄。開啟記錄後，收到的訊息會出現在這裡。"); return }
+                for (e in list) {
+                    box.text(MsgLog.fmt(e.time) + "　" + (if (e.sender.isNotBlank()) e.sender + "（" + Apps.label(act, e.pkg) + "）" else Apps.label(act, e.pkg)), 12f, color = textSub)
+                    box.text(e.text, 14.5f)
+                    box.space(6)
+                }
+            }
+            search.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: android.text.Editable?) = refresh()
+            })
+            button("重新整理") { refresh() }
+            button("清除全部紀錄") {
+                AlertDialog.Builder(act).setTitle("清除全部訊息紀錄？")
+                    .setPositiveButton("清除") { _, _ -> MsgLog.clear(); refresh() }.setNegativeButton("取消", null).show()
+            }
+            refresh()
+        }
+    }
+
+    // =========================== Tab 11 假 GPS 定位 ===========================
+
+    fun mockGps(root: LinearLayout) = with(ui) {
+        card(root, "假 GPS 定位（需 Shizuku）") {
+            hint("用 Shizuku 把本 App 設成「模擬定位來源」，再持續送出你指定的座標。")
+            text("⚠ 違反多數 App／遊戲的服務條款，可能被封號或鎖定，請自行評估風險。", 12.5f, color = badColor)
+            if (!Shell.ready()) { status("Shizuku", false) { pages.requestShizuku() }; return@card }
+            val granted = MockLocation.isMockGranted(act)
+            status("已設為模擬定位來源", granted) { App.bg { MockLocation.grantMockViaShizuku(act); App.ui { act.render() } } }
+            if (!granted) button("用 Shizuku 設為模擬定位來源", primary = true) {
+                App.bg { val ok = MockLocation.grantMockViaShizuku(act); App.ui { act.toast(if (ok) "完成" else "失敗"); act.render() } }
+            }
+        }
+        card(root, "座標") {
+            val latE = android.widget.EditText(act).apply { setText(MockLocation.lat().toString()); inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED; hint = "緯度 lat" }
+            val lngE = android.widget.EditText(act).apply { setText(MockLocation.lng().toString()); inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED; hint = "經度 lng" }
+            text("緯度 Latitude", 13f, color = textSub); addView(latE)
+            text("經度 Longitude", 13f, color = textSub); addView(lngE)
+            fun saveCoord() { Prefs.put(MockLocation.K_LAT, latE.text.toString().trim()); Prefs.put(MockLocation.K_LNG, lngE.text.toString().trim()) }
+            hint("常用地點：")
+            for ((name, la, ln) in listOf(Triple("台北101", "25.0339", "121.5645"), Triple("台北車站", "25.0478", "121.5170"), Triple("高雄85大樓", "22.6126", "120.3000"))) {
+                button(name) { latE.setText(la); lngE.setText(ln); saveCoord() }
+            }
+            text(if (MockLocation.running) "狀態：定位模擬中" else "狀態：未啟動", bold = true)
+            button(if (MockLocation.running) "停止假定位" else "開始假定位", primary = !MockLocation.running) {
+                saveCoord()
+                if (MockLocation.running) MockLocation.stop(act)
+                else {
+                    if (!MockLocation.isMockGranted(act)) { act.toast("請先用 Shizuku 設為模擬定位來源"); return@button }
+                    MockLocation.start(act)
+                }
+                App.ui(400) { act.render() }
+            }
+            hint("啟動後保持本服務在背景；部分 App 需重新整理定位或重開才會抓到。")
+        }
+    }
+
 }

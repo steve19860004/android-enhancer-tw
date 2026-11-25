@@ -59,7 +59,7 @@ class MainActivity : Activity() {
 
     val tabs = listOf(
         "sw" to "切換器", "t1" to "1 來電音樂", "t2" to "2 相簿守護", "t3" to "3 語音攔截",
-        "t4" to "4 環境隱身", "t5" to "5 捲動翻譯", "t6" to "6 工具", "sys" to "7 系統", "ac" to "8 自動點擊", "vol" to "9 音量", "set" to "⚙ 設定"
+        "t4" to "4 環境隱身", "t5" to "5 捲動翻譯", "t6" to "6 工具", "sys" to "7 系統", "ac" to "8 自動點擊", "vol" to "9 音量", "msg" to "10 收回訊息", "gps" to "11 定位", "set" to "⚙ 設定"
     )
 
     lateinit var ui: Ui
@@ -164,6 +164,8 @@ class MainActivity : Activity() {
             "sys" -> sysPages.system(content)
             "ac" -> sysPages.clicker(content)
             "vol" -> sysPages.volume(content)
+            "msg" -> sysPages.msgLog(content)
+            "gps" -> sysPages.mockGps(content)
             else -> pages.settings(content)
         }
     }

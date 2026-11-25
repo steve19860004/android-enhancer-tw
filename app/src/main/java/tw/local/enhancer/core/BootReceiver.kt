@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import tw.local.enhancer.App
+import tw.local.enhancer.core.Shell
 import tw.local.enhancer.feature.photoguard.PhotoGuard
 import tw.local.enhancer.feature.strict.StrictMode
 import tw.local.enhancer.feature.switcher.FloatingService
@@ -20,6 +21,7 @@ class BootReceiver : BroadcastReceiver() {
             }
         }
         tw.local.enhancer.feature.timeline.TimelineShizuku.scheduleDaily(ctx)
+        App.bg { if (Shell.ready()) tw.local.enhancer.feature.sys.SysTools.reapplyDark() }
         if (Prefs.bool(FloatingService.K_ENABLED) && Perms.overlay(ctx)) {
             runCatching { FloatingService.start(ctx) }
         }

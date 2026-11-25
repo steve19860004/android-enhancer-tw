@@ -181,5 +181,50 @@ object SysTools {
         return if (splits.isEmpty()) "已匯出 APK" else "已匯出 .apks（含 ${splits.size} 個分割檔，可用 SAI 等工具安裝）"
     }
 
-    fun onShizukuReady() = App.bg { reapplyFirewall() }
+    // ---------------- 強制分割畫面／自由小窗 ----------------
+    private const val FREEFORM = "enable_freeform_support"
+    private const val RESIZABLE = "force_resizable_activities"
+
+    fun freeformOn(ctx: Context): Boolean =
+        Settings.Global.getInt(ctx.contentResolver, FREEFORM, 0) == 1 &&
+            Settings.Global.getInt(ctx.contentResolver, RESIZABLE, 0) == 1
+
+    /** 回傳是否成功；需寫入安全設定或 Shizuku。重開機後生效最完整。 */
+    fun setFreeform(ctx: Context, on: Boolean): Boolean {
+        val v = if (on) 1 else 0
+        if (Perms.writeSecure(ctx)) {
+            return runCatching {
+                Settings.Global.putInt(ctx.contentResolver, FREEFORM, v)
+                Settings.Global.putInt(ctx.contentResolver, RESIZABLE, v)
+            }.isSuccess
+        }
+        if (!Shell.ready()) return false
+        Shell.exec("settings put global $FREEFORM $v")
+        Shell.exec("settings put global $RESIZABLE $v")
+        return true
+    }
+
+    // ---------------- 全域強制深色 ----------------
+    const val K_DARK = "sys_force_dark"
+
+    fun darkOn() = Prefs.bool(K_DARK)
+
+    /** 系統深色＋對不支援的 App 強制深色（force-dark）。需 Shizuku。 */
+    fun setDark(on: Boolean): Boolean {
+        if (!Shell.ready()) return false
+        val r1 = Shell.exec("cmd uimode night ${if (on) "yes" else "no"}")
+        // force-dark：開發者選項「Override force-dark」底層的旗標
+        Shell.exec("setprop debug.hwui.force_dark ${if (on) "true" else "false"}")
+        Prefs.put(K_DARK, on)
+        return r1.ok
+    }
+
+    /** 開機後重新套用（force-dark 的 setprop 重開機會消失） */
+    fun reapplyDark() {
+        if (!darkOn() || !Shell.ready()) return
+        Shell.exec("cmd uimode night yes")
+        Shell.exec("setprop debug.hwui.force_dark true")
+    }
+
+    fun onShizukuReady() = App.bg { reapplyFirewall(); reapplyDark() }
 }
