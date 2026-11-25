@@ -462,20 +462,30 @@ class Pages(private val act: MainActivity) {
             }
         }
         card(root, "Google 地圖麥克風修正") {
-            hint("陸版 vivo 常見：地圖按麥克風時圖示完全不跳、最後「無法辨識」，但 Gboard 語音、Google 搜尋麥克風都正常。原因是系統把 Google 地圖的麥克風 appops 設成擋著（介面卻顯示允許）。用 Shizuku 從底層強制開啟即可。需 Shizuku。")
-            button("① 檢查地圖麥克風狀態") {
+            hint("陸版 vivo／小米常見：地圖按麥克風圖示不跳、「無法辨識」，但 Gboard 語音、Google 搜尋都正常。根因是陸版系統拿掉了「Google 語音服務（Speech Services by Google）」——這是地圖語音真正綁的辨識元件，缺了就錄到靜音。補裝它＋給麥克風權限即可。給權限需 Shizuku。")
+            text(VoiceFix.mapsVoiceStatus(act), 12f)
+            button("① 安裝 Google 語音服務（Play 商店）") {
+                runCatching {
+                    act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${VoiceFix.TTS_PKG}")))
+                }.onFailure {
+                    act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${VoiceFix.TTS_PKG}")))
+                }
+            }
+            button("② 一鍵修正（給語音服務麥克風權限）", primary = true) {
+                when {
+                    !VoiceFix.ttsInstalled(act) -> act.toast("請先按①安裝 Google 語音服務")
+                    !Shell.ready() -> requestShizuku()
+                    else -> App.bg { val s = VoiceFix.fixMapsVoice(act); App.ui { act.showText("已修正", s); act.render() } }
+                }
+            }
+            hint("修好後回地圖按麥克風講一句，圖示跳動＝成功。備援：若還不行，再加裝「Android Auto」補底層元件。")
+            hint("────── 進階：另一種成因／診斷工具 ──────")
+            button("查地圖麥克風 appops 狀態") {
                 if (!Shell.ready()) { requestShizuku(); return@button }
                 App.bg { val s = VoiceFix.mapsMicState(); App.ui { act.showText("Google 地圖麥克風狀態", s) } }
             }
-            button("② 一鍵強制開啟地圖麥克風", primary = true) {
-                if (!Shell.ready()) { requestShizuku(); return@button }
-                App.bg { val s = VoiceFix.fixMapsMic(); App.ui { act.showText("已嘗試修正", s) } }
-            }
-            hint("改完回地圖按麥克風講一句，圖示會跳動＝成功。若還是不跳，按「①」把狀態截圖給我。")
-            hint("────── 另一種成因（語音辨識服務被換成陸版）──────")
-            if (!VoiceFix.googleInstalled(act)) text("⚠ 沒有安裝 Google App", 12.5f, color = badColor)
-            button("讀取目前語音服務設定") {
-                App.bg { val s = VoiceFix.read(act); App.ui { act.showText("目前設定（請截圖回報）", s) } }
+            button("讀取目前語音辨識服務") {
+                App.bg { val s = VoiceFix.read(act); App.ui { act.showText("目前設定", s) } }
             }
             button("切回 Google 語音辨識") {
                 if (!Shell.ready() && !Perms.writeSecure(act)) { requestShizuku(); return@button }
