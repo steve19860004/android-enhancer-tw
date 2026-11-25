@@ -461,21 +461,30 @@ class Pages(private val act: MainActivity) {
                 act.pickApk { log.text = it }
             }
         }
-        card(root, "Google 地圖麥克風修正（實驗）") {
-            hint("陸版 ROM 升級後常把系統預設「語音辨識服務」改成陸版的，導致 Google 地圖語音搜尋失靈（Play 商店、App 內搜尋麥克風不受影響）。這裡可把它切回 Google，全程可還原。需 Shizuku 或寫入安全設定。")
+        card(root, "Google 地圖麥克風修正") {
+            hint("陸版 vivo 常見：地圖按麥克風時圖示完全不跳、最後「無法辨識」，但 Gboard 語音、Google 搜尋麥克風都正常。原因是系統把 Google 地圖的麥克風 appops 設成擋著（介面卻顯示允許）。用 Shizuku 從底層強制開啟即可。需 Shizuku。")
+            button("① 檢查地圖麥克風狀態") {
+                if (!Shell.ready()) { requestShizuku(); return@button }
+                App.bg { val s = VoiceFix.mapsMicState(); App.ui { act.showText("Google 地圖麥克風狀態", s) } }
+            }
+            button("② 一鍵強制開啟地圖麥克風", primary = true) {
+                if (!Shell.ready()) { requestShizuku(); return@button }
+                App.bg { val s = VoiceFix.fixMapsMic(); App.ui { act.showText("已嘗試修正", s) } }
+            }
+            hint("改完回地圖按麥克風講一句，圖示會跳動＝成功。若還是不跳，按「①」把狀態截圖給我。")
+            hint("────── 另一種成因（語音辨識服務被換成陸版）──────")
             if (!VoiceFix.googleInstalled(act)) text("⚠ 沒有安裝 Google App", 12.5f, color = badColor)
             button("讀取目前語音服務設定") {
                 App.bg { val s = VoiceFix.read(act); App.ui { act.showText("目前設定（請截圖回報）", s) } }
             }
-            button("一鍵切回 Google 語音辨識", primary = true) {
+            button("切回 Google 語音辨識") {
                 if (!Shell.ready() && !Perms.writeSecure(act)) { requestShizuku(); return@button }
                 if (!VoiceFix.googleInstalled(act)) { act.toast("請先安裝 Google App"); return@button }
-                App.bg { val ok = VoiceFix.applyGoogle(act); App.ui { act.toast(if (ok) "已切回 Google，開 Google 地圖試麥克風" else "失敗"); act.render() } }
+                App.bg { val ok = VoiceFix.applyGoogle(act); App.ui { act.toast(if (ok) "已切回 Google" else "失敗"); act.render() } }
             }
             if (VoiceFix.canRestore()) button("還原成原本的語音辨識服務") {
                 App.bg { val ok = VoiceFix.restore(act); App.ui { act.toast(if (ok) "已還原" else "失敗"); act.render() } }
             }
-            hint("切回後若 Google 地圖麥克風還是不行，代表不是這個原因，請把「讀取目前設定」的截圖給我。")
         }
         card(root, "輸入法管理") {
             hint("清單直接讀系統，不需 Shizuku；設為預設／啟用／停用需要 Shizuku。")
