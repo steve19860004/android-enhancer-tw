@@ -21,6 +21,7 @@ class App : Application() {
         }
         createChannels()
         Shell.init()
+        tw.local.enhancer.feature.volume.VolumeBooster.restoreIfEnabled()
         // Shizuku 連上時，把之前沒能還原的狀態補還原（例如重開機後 Shizuku 晚啟動）
         runCatching {
             rikka.shizuku.Shizuku.addBinderReceivedListenerSticky {

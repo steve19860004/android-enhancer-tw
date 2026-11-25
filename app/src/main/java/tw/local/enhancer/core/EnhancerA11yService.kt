@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import tw.local.enhancer.feature.photoguard.PhotoGuard
 import tw.local.enhancer.feature.strict.StrictMode
@@ -12,6 +13,7 @@ import tw.local.enhancer.feature.switcher.RecentTracker
 import tw.local.enhancer.feature.timeline.TimelineFlow
 import tw.local.enhancer.feature.tools.PowerCamera
 import tw.local.enhancer.feature.translate.ScrollTranslator
+import tw.local.enhancer.feature.volume.VolumeBooster
 import tw.local.enhancer.feature.voice.VoiceIntercept
 
 /**
@@ -93,6 +95,29 @@ class EnhancerA11yService : AccessibilityService() {
         RecentTracker.onForeground(this, pkg)
         PhotoGuard.onForeground(this, pkg)
         StrictMode.onForeground(this, prev, pkg)
+    }
+
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (!VolumeBooster.enabled() || !tw.local.enhancer.core.Prefs.bool(VolumeBooster.K_KEYHOOK)) return false
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> {
+                // 媒體音量已最大，再按音量＋ → 攔下來改成往上加增益
+                if (VolumeBooster.mediaAtMax(this)) {
+                    if (event.action == KeyEvent.ACTION_DOWN) VolumeBooster.bump(this, VolumeBooster.STEP_MB)
+                    return true
+                }
+                return false
+            }
+            KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                // 有增益時先把增益降回來，降到 0 再恢復正常調音量
+                if (VolumeBooster.gainMb() > 0) {
+                    if (event.action == KeyEvent.ACTION_DOWN) VolumeBooster.bump(this, -VolumeBooster.STEP_MB)
+                    return true
+                }
+                return false
+            }
+        }
+        return false
     }
 
     override fun onInterrupt() {}

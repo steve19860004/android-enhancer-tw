@@ -26,6 +26,7 @@ import tw.local.enhancer.feature.clicker.ClickerService
 import tw.local.enhancer.feature.clicker.Script
 import tw.local.enhancer.feature.clicker.Scripts
 import tw.local.enhancer.feature.sys.SysTools
+import tw.local.enhancer.feature.volume.VolumeBooster
 
 /** Tab 7 系統工具、Tab 8 自動點擊 */
 class SysPages(private val act: MainActivity, private val pages: Pages) {
@@ -215,6 +216,51 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                         } else run()
                     }.show()
             }
+        }
+    }
+
+    // =========================== Tab 9 音量 ===========================
+
+    fun volume(root: LinearLayout) = with(ui) {
+        card(root, "音量增大器（免 root）") {
+            hint("用系統效果把整機媒體音量推到 100% 以上，最高 +15 dB（約 5.6 倍）。")
+            text("⚠ 推太大會破音，長時間大音量也會傷聽力與喇叭，請適量。", 12.5f, color = badColor)
+            val on = toggle("啟用音量增大", VolumeBooster.K_ENABLED) { v ->
+                if (v) { if (!VolumeBooster.enable()) act.showText("無法啟用", "這台手機可能擋了全域音訊效果。\n" + VolumeBooster.lastError) }
+                else VolumeBooster.disable()
+                act.render()
+            }
+            if (VolumeBooster.enabled() && VolumeBooster.lastError.isNotEmpty())
+                text("⚠ " + VolumeBooster.lastError, 12.5f, color = badColor)
+            val gTv = text("目前增益：+%.1f dB".format(VolumeBooster.gainDb()), bold = true)
+            val sb = android.widget.SeekBar(act).apply {
+                max = VolumeBooster.MAX_MB
+                progress = VolumeBooster.gainMb()
+                setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: android.widget.SeekBar, p: Int, u: Boolean) { gTv.text = "目前增益：+%.1f dB".format(p / 100f) }
+                    override fun onStartTrackingTouch(s: android.widget.SeekBar) {}
+                    override fun onStopTrackingTouch(s: android.widget.SeekBar) {
+                        if (!VolumeBooster.enabled()) { on.isChecked = true; VolumeBooster.enable() }
+                        VolumeBooster.setGain(s.progress)
+                    }
+                })
+            }
+            addView(sb)
+            hint("拖曳手動調整增益；關閉時歸零恢復原音量。")
+        }
+        card(root, "音量鍵自動增大（需無障礙）") {
+            hint("開啟後：媒體音量已經最大時，再按「音量＋」就會自動往上加增益（一直按持續增加）；按「音量－」先把增益降回來，降到 0 再恢復正常調音量。")
+            if (!Perms.a11y(act)) status("無障礙服務", false) { Perms.openA11y(act) }
+            if (!Perms.overlay(act)) hint("提示：開「顯示在其他應用程式上層」可在調整時顯示增益浮層，否則用 Toast 提示。")
+            toggle("啟用音量鍵攔截", VolumeBooster.K_KEYHOOK) { v ->
+                if (v && !Perms.a11y(act)) { Perms.openA11y(act) }
+                Prefs.put(VolumeBooster.K_KEYHOOK, v)
+            }
+        }
+        card(root, "快速測試") {
+            button("增益 +1 dB") { VolumeBooster.bump(act, VolumeBooster.STEP_MB); act.render() }
+            button("增益 -1 dB") { VolumeBooster.bump(act, -VolumeBooster.STEP_MB); act.render() }
+            button("歸零") { VolumeBooster.setGain(0); act.render() }
         }
     }
 
