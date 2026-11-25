@@ -16,6 +16,7 @@ import tw.local.enhancer.core.Shell
 object VoiceFix {
     const val GOOGLE_PKG = "com.google.android.googlequicksearchbox"
     const val GOOGLE_RECOG = "com.google.android.googlequicksearchbox/com.google.android.voicesearch.serviceapi.GoogleRecognitionService"
+    const val MAPS_PKG = "com.google.android.apps.maps"
 
     private const val RECOG = "voice_recognition_service"
     private const val ASSIST = "assistant"
@@ -50,6 +51,44 @@ object VoiceFix {
     }
 
     fun canRestore() = Prefs.has(K_SAVED)
+
+    // ---- Google 地圖麥克風（appops 層）----
+    // 症狀：權限介面顯示「允許」，但講話時麥克風圖示完全不跳、最後「無法辨識」。
+    // 原因：vivo 陸版常把 Google 地圖的 RECORD_AUDIO appop 設成 ignore，
+    //       系統不報錯、改回傳靜音給辨識引擎，所以收不到音。
+    // 修正：用 Shizuku 把 appop 強制設回 allow，並補 pm grant。全程只動 Google 地圖。
+    private fun run(cmd: String) = if (Shell.ready()) Shell.exec(cmd) else null
+
+    fun mapsMicState(): String {
+        if (!Shell.ready()) return "需要先啟動 Shizuku 才能查 appops。"
+        val op = run("cmd appops get $MAPS_PKG RECORD_AUDIO")
+        val all = run("cmd appops get $MAPS_PKG")
+        val perm = run("dumpsys package $MAPS_PKG | grep -i record_audio")
+        val sb = StringBuilder()
+        sb.append("RECORD_AUDIO appop：\n")
+        sb.append((op?.out ?: op?.err ?: "").ifBlank { "(無輸出)" }).append("\n\n")
+        sb.append("套件權限（manifest 層）：\n")
+        sb.append((perm?.out ?: "").ifBlank { "(查不到)" }).append("\n\n")
+        sb.append("其他非預設 appops（找有沒有 ignore/deny）：\n")
+        sb.append((all?.out ?: "").ifBlank { "(全部預設)" })
+        return sb.toString()
+    }
+
+    fun fixMapsMic(): String {
+        if (!Shell.ready()) return "需要先啟動 Shizuku。"
+        val sb = StringBuilder()
+        val r1 = run("cmd appops set $MAPS_PKG RECORD_AUDIO allow")
+        sb.append(if (r1?.ok == true) "✓ appops RECORD_AUDIO 設為 allow\n" else "✗ appops 設定失敗：${r1?.err}\n")
+        // 補 runtime 權限（已授予會直接過，失敗忽略）
+        run("pm grant $MAPS_PKG android.permission.RECORD_AUDIO")
+        // 部分機型有獨立的沙箱錄音 op，一起放行（舊系統沒有會報錯，忽略）
+        run("cmd appops set $MAPS_PKG RECORD_AUDIO_SANDBOXED allow")
+        sb.append("\n改完的狀態：\n")
+        val after = run("cmd appops get $MAPS_PKG RECORD_AUDIO")
+        sb.append((after?.out ?: "").ifBlank { "(無輸出)" })
+        sb.append("\n\n→ 回 Google 地圖按麥克風講一句，看圖示會不會跳動。")
+        return sb.toString()
+    }
 
     private fun put(ctx: Context, key: String, value: String): Boolean {
         // 這類 secure 設定用 Shizuku（adb shell）最保險，寫入安全設定當備援
