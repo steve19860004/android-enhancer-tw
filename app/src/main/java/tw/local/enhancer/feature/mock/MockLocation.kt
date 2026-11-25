@@ -28,20 +28,29 @@ object MockLocation {
 
     @Volatile var running = false
         private set
+    @Volatile var lastError: String = ""
 
     fun lat() = Prefs.str(K_LAT, "25.0330").toDoubleOrNull() ?: 25.0330
     fun lng() = Prefs.str(K_LNG, "121.5654").toDoubleOrNull() ?: 121.5654
 
-    /** 用 Shizuku 把本 App 設成模擬定位來源（Android 6+ 用 appops，不需開發者選項選 App） */
-    fun grantMockViaShizuku(ctx: Context): Boolean {
-        if (!Shell.ready()) return false
-        val r = Shell.exec("appops set ${ctx.packageName} android:mock_location allow")
-        return r.ok
+    /** 用 Shizuku 設成模擬定位來源；回傳 (是否成功, 指令輸出供診斷) */
+    fun grantMockViaShizuku(ctx: Context): Pair<Boolean, String> {
+        if (!Shell.ready()) return false to "Shizuku 未連線"
+        val pkg = ctx.packageName
+        val log = StringBuilder()
+        for (op in listOf("android:mock_location", "mock_location")) {
+            val r = Shell.exec("appops set $pkg $op allow")
+            log.append("set $op → ").append(if (r.ok) "ok" else r.toString().ifBlank { "code ${r.code}" }).append('\n')
+        }
+        val g = Shell.exec("appops get $pkg android:mock_location")
+        log.append("get → ").append(g.toString().ifBlank { "(空)" })
+        return isMockGranted(ctx) to log.toString().trim()
     }
 
     fun isMockGranted(ctx: Context): Boolean {
         if (!Shell.ready()) return false
-        val out = Shell.exec("appops get ${ctx.packageName} android:mock_location").out
+        val out = (Shell.exec("appops get ${ctx.packageName} android:mock_location").toString() +
+            Shell.exec("appops get ${ctx.packageName} mock_location").toString())
         return out.contains("allow", true)
     }
 
@@ -91,12 +100,17 @@ object MockLocation {
         }
 
         private fun setup() {
+            lastError = ""
+            var okAny = false
             for (p in providers) {
-                runCatching {
+                val r = runCatching {
                     lm.addTestProvider(p, false, false, false, false, true, true, true, 1, 1)
                     lm.setTestProviderEnabled(p, true)
                 }
+                if (r.isSuccess) okAny = true
+                else lastError = r.exceptionOrNull()?.message ?: r.exceptionOrNull().toString()
             }
+            if (!okAny && lastError.isBlank()) lastError = "無法建立測試定位提供者"
         }
 
         private fun push() {

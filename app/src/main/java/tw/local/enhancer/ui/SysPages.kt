@@ -440,10 +440,20 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
             hint("用 Shizuku 把本 App 設成「模擬定位來源」，再持續送出你指定的座標。")
             text("⚠ 違反多數 App／遊戲的服務條款，可能被封號或鎖定，請自行評估風險。", 12.5f, color = badColor)
             if (!Shell.ready()) { status("Shizuku", false) { pages.requestShizuku() }; return@card }
-            val granted = MockLocation.isMockGranted(act)
-            status("已設為模擬定位來源", granted) { App.bg { MockLocation.grantMockViaShizuku(act); App.ui { act.render() } } }
-            if (!granted) button("用 Shizuku 設為模擬定位來源", primary = true) {
-                App.bg { val ok = MockLocation.grantMockViaShizuku(act); App.ui { act.toast(if (ok) "完成" else "失敗"); act.render() } }
+            val stat = text("檢查授權中…", 13f, bold = true)
+            App.bg { val g = MockLocation.isMockGranted(act); App.ui { stat.text = if (g) "✓ 已設為模擬定位來源" else "✗ 尚未設為模擬定位來源" } }
+            button("用 Shizuku 設為模擬定位來源", primary = true) {
+                App.bg {
+                    val (ok, log) = MockLocation.grantMockViaShizuku(act)
+                    App.ui {
+                        if (ok) { act.toast("已設定完成"); act.render() }
+                        else act.showText("設定結果（請截圖回報）", log + "\n\n若仍未成功，可改用下方『開發者選項手動選取』。")
+                    }
+                }
+            }
+            button("改用開發者選項手動選取") {
+                runCatching { act.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
+                act.showText("手動選取步驟", "在開發人員選項裡找到「選取模擬位置資訊應用程式 / Select mock location app」，選「免Root百寶箱」。有些機型搜尋「模擬位置」就找得到。")
             }
         }
         card(root, "座標") {
@@ -464,7 +474,11 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                     if (!MockLocation.isMockGranted(act)) { act.toast("請先用 Shizuku 設為模擬定位來源"); return@button }
                     MockLocation.start(act)
                 }
-                App.ui(400) { act.render() }
+                App.ui(900) {
+                    if (MockLocation.running && MockLocation.lastError.isNotEmpty())
+                        act.showText("假定位啟動失敗", MockLocation.lastError + "\n\n多半是還沒設為模擬定位來源，或這台 ROM 擋了測試定位。先完成上面的授權再試。")
+                    act.render()
+                }
             }
             hint("啟動後保持本服務在背景；部分 App 需重新整理定位或重開才會抓到。")
         }
