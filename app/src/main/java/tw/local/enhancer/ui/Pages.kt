@@ -35,7 +35,6 @@ import tw.local.enhancer.feature.timeline.TimelineShizuku
 import tw.local.enhancer.feature.translate.Langs
 import tw.local.enhancer.feature.translate.ScrollTranslator
 import tw.local.enhancer.feature.voice.VoiceIntercept
-import tw.local.enhancer.feature.voicefix.VoiceFix
 import tw.local.enhancer.tiles.FanExpandTile
 import tw.local.enhancer.tiles.ScrollTranslateTile
 
@@ -459,41 +458,6 @@ class Pages(private val act: MainActivity) {
             button("選擇 APK 並安裝") {
                 if (!Shell.ready()) { requestShizuku(); return@button }
                 act.pickApk { log.text = it }
-            }
-        }
-        card(root, "Google 地圖麥克風修正") {
-            hint("陸版 vivo／小米常見：地圖按麥克風圖示不跳、「無法辨識」，但 Gboard 語音、Google 搜尋都正常。根因是陸版系統拿掉了「Google 語音服務（Speech Services by Google）」——這是地圖語音真正綁的辨識元件，缺了就錄到靜音。補裝它＋給麥克風權限即可。給權限需 Shizuku。")
-            text(VoiceFix.mapsVoiceStatus(act), 12f)
-            button("① 安裝 Google 語音服務（Play 商店）") {
-                runCatching {
-                    act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${VoiceFix.TTS_PKG}")))
-                }.onFailure {
-                    act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${VoiceFix.TTS_PKG}")))
-                }
-            }
-            button("② 一鍵修正（給語音服務麥克風權限）", primary = true) {
-                when {
-                    !VoiceFix.ttsInstalled(act) -> act.toast("請先按①安裝 Google 語音服務")
-                    !Shell.ready() -> requestShizuku()
-                    else -> App.bg { val s = VoiceFix.fixMapsVoice(act); App.ui { act.showText("已修正", s); act.render() } }
-                }
-            }
-            hint("修好後回地圖按麥克風講一句，圖示跳動＝成功。備援：若還不行，再加裝「Android Auto」補底層元件。")
-            hint("────── 進階：另一種成因／診斷工具 ──────")
-            button("查地圖麥克風 appops 狀態") {
-                if (!Shell.ready()) { requestShizuku(); return@button }
-                App.bg { val s = VoiceFix.mapsMicState(); App.ui { act.showText("Google 地圖麥克風狀態", s) } }
-            }
-            button("讀取目前語音辨識服務") {
-                App.bg { val s = VoiceFix.read(act); App.ui { act.showText("目前設定", s) } }
-            }
-            button("切回 Google 語音辨識") {
-                if (!Shell.ready() && !Perms.writeSecure(act)) { requestShizuku(); return@button }
-                if (!VoiceFix.googleInstalled(act)) { act.toast("請先安裝 Google App"); return@button }
-                App.bg { val ok = VoiceFix.applyGoogle(act); App.ui { act.toast(if (ok) "已切回 Google" else "失敗"); act.render() } }
-            }
-            if (VoiceFix.canRestore()) button("還原成原本的語音辨識服務") {
-                App.bg { val ok = VoiceFix.restore(act); App.ui { act.toast(if (ok) "已還原" else "失敗"); act.render() } }
             }
         }
         card(root, "輸入法管理") {
