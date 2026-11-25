@@ -17,6 +17,9 @@ object VoiceFix {
     const val GOOGLE_PKG = "com.google.android.googlequicksearchbox"
     const val GOOGLE_RECOG = "com.google.android.googlequicksearchbox/com.google.android.voicesearch.serviceapi.GoogleRecognitionService"
     const val MAPS_PKG = "com.google.android.apps.maps"
+    // Speech Services by Google（中文「Google 語音服務」）：陸版 ROM 常被拿掉，
+    // 這是 Google 地圖語音搜尋真正綁的辨識元件，缺了就錄到靜音。
+    const val TTS_PKG = "com.google.android.tts"
 
     private const val RECOG = "voice_recognition_service"
     private const val ASSIST = "assistant"
@@ -58,6 +61,44 @@ object VoiceFix {
     //       系統不報錯、改回傳靜音給辨識引擎，所以收不到音。
     // 修正：用 Shizuku 把 appop 強制設回 allow，並補 pm grant。全程只動 Google 地圖。
     private fun run(cmd: String) = if (Shell.ready()) Shell.exec(cmd) else null
+
+    fun ttsInstalled(ctx: Context) = Apps.installed(ctx, TTS_PKG)
+
+    /** 地圖語音現況：關鍵是有沒有裝 Google 語音服務。 */
+    fun mapsVoiceStatus(ctx: Context): String {
+        val sb = StringBuilder()
+        val tts = ttsInstalled(ctx)
+        sb.append(if (tts) "✓ 已安裝 Google 語音服務（Speech Services by Google）\n"
+                  else "✗ 未安裝 Google 語音服務 ← 關鍵缺件，請先按「① 安裝」\n")
+        if (tts && Shell.ready()) {
+            val op = run("cmd appops get $TTS_PKG RECORD_AUDIO")
+            val line = (op?.out ?: "").lineSequence().firstOrNull { it.contains("RECORD_AUDIO", true) }?.trim()
+            sb.append("　語音服務麥克風：${line ?: "(預設)"}\n")
+        }
+        sb.append(if (googleInstalled(ctx)) "✓ 已安裝 Google App\n" else "✗ 未安裝 Google App\n")
+        return sb.toString().trimEnd()
+    }
+
+    /**
+     * 一鍵修正：把 Google 語音服務（和 Google App、地圖）的麥克風權限全部開到底。
+     * 回傳 "NEED_INSTALL" 代表還沒裝 Google 語音服務，呼叫端要去開 Play。
+     */
+    fun fixMapsVoice(ctx: Context): String {
+        if (!ttsInstalled(ctx)) return "NEED_INSTALL"
+        if (!Shell.ready()) return "NEED_SHIZUKU"
+        val sb = StringBuilder()
+        // 關鍵：給 Google 語音服務麥克風
+        run("pm grant $TTS_PKG android.permission.RECORD_AUDIO")
+        val a = run("cmd appops set $TTS_PKG RECORD_AUDIO allow")
+        sb.append(if (a?.ok == true) "✓ Google 語音服務 麥克風已開啟\n" else "✗ 設定失敗：${a?.err}\n")
+        // 連帶把 Google App、地圖的麥克風也放行（保險，無害）
+        run("pm grant $GOOGLE_PKG android.permission.RECORD_AUDIO")
+        run("cmd appops set $GOOGLE_PKG RECORD_AUDIO allow")
+        run("cmd appops set $MAPS_PKG RECORD_AUDIO allow")
+        sb.append("✓ Google App／地圖 麥克風一併放行\n")
+        sb.append("\n→ 回 Google 地圖按麥克風講一句，圖示會跳動＝修好了。")
+        return sb.toString()
+    }
 
     fun mapsMicState(): String {
         if (!Shell.ready()) return "需要先啟動 Shizuku 才能查 appops。"
