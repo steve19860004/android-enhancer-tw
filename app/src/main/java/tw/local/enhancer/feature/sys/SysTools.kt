@@ -226,5 +226,29 @@ object SysTools {
         Shell.exec("setprop debug.hwui.force_dark true")
     }
 
+    // ---------------- 通知歷史（救回已清掉的通知） ----------------
+    fun notifHistoryOn(ctx: Context): Boolean =
+        Settings.Secure.getInt(ctx.contentResolver, "notification_history_enabled", 0) == 1
+
+    fun setNotifHistory(ctx: Context, on: Boolean): Boolean {
+        val v = if (on) 1 else 0
+        if (Shell.ready()) return Shell.exec("settings put secure notification_history_enabled $v").ok
+        if (Perms.writeSecure(ctx)) return runCatching {
+            Settings.Secure.putInt(ctx.contentResolver, "notification_history_enabled", v)
+        }.isSuccess
+        return false
+    }
+
+    fun openNotifHistory(ctx: Context) {
+        val go = android.content.Intent("android.settings.NOTIFICATION_HISTORY")
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { ctx.startActivity(go) }.onFailure {
+            runCatching {
+                ctx.startActivity(android.content.Intent(Settings.ACTION_SETTINGS)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
+    }
+
     fun onShizukuReady() = App.bg { reapplyFirewall(); reapplyDark() }
 }
