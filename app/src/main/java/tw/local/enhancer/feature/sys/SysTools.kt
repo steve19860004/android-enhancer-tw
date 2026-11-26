@@ -103,6 +103,55 @@ object SysTools {
         return r
     }
 
+    // ---------------- 通知保活（修 FCM／通知延遲）----------------
+    const val K_KEEPALIVE = "sys_keepalive"   // 使用者選的保活 App
+
+    // 常被陸版系統殺掉而導致通知延遲的 App：Google 全家桶(FCM) + 國際通訊
+    val KEEPALIVE_SUGGEST = listOf(
+        "com.google.android.gms",                 // Google Play 服務（FCM 核心）
+        "com.google.android.gsf",                 // Google 服務框架
+        "com.android.vending",                    // Play 商店
+        "com.google.android.googlequicksearchbox",// Google App
+        "jp.naver.line.android",                  // LINE
+        "com.facebook.katana", "com.facebook.orca",
+        "com.whatsapp", "org.telegram.messenger",
+        "com.instagram.android",
+        "com.google.android.gm",                  // Gmail
+        "com.shopee.tw",                          // 蝦皮
+        "org.thoughtcrime.securesms",             // Signal
+        "com.microsoft.office.outlook"
+    )
+
+    fun keepaliveSet(): Set<String> = Prefs.set(K_KEEPALIVE)
+
+    /** 對單一 App 套用全套保活：電池白名單＋背景＋通知權限＋standby active */
+    fun applyKeepalive(pkg: String): Boolean {
+        val a = Shell.exec("dumpsys deviceidle whitelist +${Shell.q(pkg)}")
+        Shell.exec("cmd appops set ${Shell.q(pkg)} RUN_ANY_IN_BACKGROUND allow")
+        Shell.exec("cmd appops set ${Shell.q(pkg)} RUN_IN_BACKGROUND allow")
+        Shell.exec("cmd appops set ${Shell.q(pkg)} POST_NOTIFICATION allow")   // 解「允許通知」置灰
+        Shell.exec("pm grant ${Shell.q(pkg)} android.permission.POST_NOTIFICATIONS")
+        Shell.exec("am set-standby-bucket ${Shell.q(pkg)} active")
+        return a.ok
+    }
+
+    fun enableKeepalive(pkg: String, on: Boolean) {
+        if (on) { applyKeepalive(pkg); Prefs.put(K_KEEPALIVE, keepaliveSet() + pkg) }
+        else {
+            Shell.exec("dumpsys deviceidle whitelist -${Shell.q(pkg)}")
+            Prefs.put(K_KEEPALIVE, keepaliveSet() - pkg)
+        }
+    }
+
+    /** 強制重連 FCM：重啟 Google Play 服務，逼它重新建立推送長連線 */
+    fun reconnectFcm() = Shell.exec("am force-stop com.google.android.gms")
+
+    /** 重開機後電池白名單會被清，Shizuku 連上時重新套用 */
+    fun reapplyKeepalive() {
+        if (!Shell.ready()) return
+        for (p in keepaliveSet()) applyKeepalive(p)
+    }
+
     // ---------------- 動畫速度 ----------------
     private val ANIM_KEYS = listOf(
         Settings.Global.WINDOW_ANIMATION_SCALE, Settings.Global.TRANSITION_ANIMATION_SCALE, Settings.Global.ANIMATOR_DURATION_SCALE
@@ -250,5 +299,5 @@ object SysTools {
         }
     }
 
-    fun onShizukuReady() = App.bg { reapplyFirewall(); reapplyDark() }
+    fun onShizukuReady() = App.bg { reapplyFirewall(); reapplyDark(); reapplyKeepalive() }
 }
