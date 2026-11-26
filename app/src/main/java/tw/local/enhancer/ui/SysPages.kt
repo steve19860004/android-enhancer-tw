@@ -392,6 +392,18 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
             hint("靠通知記錄保存訊息，對方收回／刪除後你這邊還看得到。請開啟通知讀取權限。")
             status("通知讀取權限", false) { Perms.openListener(act) }
         }
+        card(root, "通知歷史（救回已清掉的通知）") {
+            hint("開啟後系統會保留最近清掉／滑掉的通知，誤清也找得回來。陸版預設常是關的。需 Shizuku 或寫入安全設定。")
+            val on = SysTools.notifHistoryOn(act)
+            text("目前：" + (if (on) "已開啟" else "未開啟"), 13f, color = if (on) textSub else badColor)
+            button(if (on) "關閉通知歷史" else "開啟通知歷史", primary = !on) {
+                if (!Shell.ready() && !Perms.writeSecure(act)) { pages.requestShizuku(); return@button }
+                val ok = SysTools.setNotifHistory(act, !on)
+                act.toast(if (ok) (if (!on) "已開啟" else "已關閉") else "失敗")
+                act.render()
+            }
+            button("開啟通知歷史畫面") { SysTools.openNotifHistory(act) }
+        }
         card(root, "救回收回訊息") {
             hint("會記錄下方勾選 App 的通知訊息，存在本機、不上傳。對方一收回，你這邊的紀錄還在。")
             text("⚠ 僅供個人備查，請勿用於騷擾或散布他人訊息。", 12.5f, color = badColor)
