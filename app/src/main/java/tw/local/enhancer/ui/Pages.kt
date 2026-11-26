@@ -431,7 +431,7 @@ class Pages(private val act: MainActivity) {
 
     // =========================== Tab 6 ===========================
 
-    fun tools(root: LinearLayout) = with(ui) {
+    fun circleSearch(root: LinearLayout) = with(ui) {
         card(root, "極速畫圈搜尋（實驗性，需 Shizuku）") {
             hint("透過 Shizuku 直接呼叫 Google 的畫圈搜尋，不用長按導覽列。需要 Google App 是預設助理，且你的 Google App 版本支援畫圈搜尋。")
             button("立即觸發畫圈搜尋", primary = true) { act.moveTaskToBack(true); App.ui(400) { CircleSearch.trigger(act.applicationContext) } }
@@ -440,6 +440,8 @@ class Pages(private val act: MainActivity) {
                 runCatching { act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/parallelcc/MiCTS"))) }
             }
         }
+    }
+    fun powerCamera(root: LinearLayout) = with(ui) {
         card(root, "雙擊電源鍵開相機") {
             val on = PowerCamera.systemGestureOn(act)
             text("系統手勢目前：" + if (on) "開啟" else "關閉", 13f, color = textSub)
@@ -450,7 +452,8 @@ class Pages(private val act: MainActivity) {
             toggle("備援偵測（系統手勢無效時用）", PowerCamera.K_FALLBACK, false,
                 "需無障礙服務。快速按兩下電源鍵（熄屏→亮屏間隔很短）就開相機。")
         }
-        timeline(root)
+    }
+    fun silentInstall(root: LinearLayout) = with(ui) {
         card(root, "Shizuku 靜默安裝 APK") {
             val log = text("選一個 APK 檔，直接安裝不跳確認畫面。", 13f, color = textSub)
             toggle("安裝來源偽裝成 Google Play 商店", tw.local.enhancer.feature.tools.SilentInstall.K_AS_PLAY, false,
@@ -460,6 +463,8 @@ class Pages(private val act: MainActivity) {
                 act.pickApk { log.text = it }
             }
         }
+    }
+    fun imeManager(root: LinearLayout) = with(ui) {
         card(root, "輸入法管理") {
             hint("清單直接讀系統，不需 Shizuku；設為預設／啟用／停用需要 Shizuku。")
             val box = ui.vbox()
@@ -470,7 +475,7 @@ class Pages(private val act: MainActivity) {
 
     // ---- 時間軸助手（移植自 Timeline-NoPair 0.26，免 Shizuku） ----
 
-    private fun timeline(root: LinearLayout) = with(ui) {
+    fun timeline(root: LinearLayout) = with(ui) {
         val shz = TimelineShizuku.isMode()
         card(root, "Google 地圖時間軸（時間軸助手）") {
             hint("把最小寬度暫時改成 640 dp → 強制停止 Google 地圖與 Google Play 服務 → 還原原本寬度。")

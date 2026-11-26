@@ -58,8 +58,8 @@ class MainActivity : Activity() {
     }
 
     val tabs = listOf(
-        "sw" to "切換器", "t1" to "1 來電音樂", "t2" to "2 相簿守護", "t3" to "3 語音攔截",
-        "t4" to "4 環境隱身", "t5" to "5 捲動翻譯", "t6" to "6 工具", "sys" to "7 系統", "ac" to "8 自動點擊", "vol" to "9 音量", "msg" to "10 收回訊息", "gps" to "11 定位", "set" to "⚙ 設定"
+        "sw" to "切換器", "comm" to "通訊", "sys" to "系統", "scr" to "螢幕",
+        "act" to "互動", "priv" to "隱私/自動", "set" to "⚙ 設定"
     )
 
     lateinit var ui: Ui
@@ -123,7 +123,10 @@ class MainActivity : Activity() {
         render()
     }
 
-    fun currentTab() = Prefs.str(K_TAB, "sw")
+    fun currentTab(): String {
+        val id = Prefs.str(K_TAB, "sw")
+        return if (tabs.any { it.first == id }) id else "sw"
+    }
 
     fun selectTab(id: String) {
         Prefs.put(K_TAB, id)
@@ -155,17 +158,11 @@ class MainActivity : Activity() {
         timelineStatus = null
         when (cur) {
             "sw" -> pages.switcher(content)
-            "t1" -> pages.callMusic(content)
-            "t2" -> pages.photoGuard(content)
-            "t3" -> pages.voice(content)
-            "t4" -> pages.strict(content)
-            "t5" -> pages.translate(content)
-            "t6" -> pages.tools(content)
-            "sys" -> sysPages.system(content)
-            "ac" -> sysPages.clicker(content)
-            "vol" -> sysPages.volume(content)
-            "msg" -> sysPages.msgLog(content)
-            "gps" -> sysPages.mockGps(content)
+            "comm" -> { pages.callMusic(content); sysPages.msgLog(content); sysPages.keepalive(content) }
+            "sys" -> { sysPages.appManage(content); pages.silentInstall(content); sysPages.apkExport(content); sysPages.dns(content); sysPages.animSpeed(content) }
+            "scr" -> { sysPages.splitScreen(content); sysPages.darkMode(content); sysPages.volume(content) }
+            "act" -> { pages.voice(content); pages.translate(content); pages.circleSearch(content); pages.imeManager(content); pages.powerCamera(content) }
+            "priv" -> { pages.strict(content); pages.photoGuard(content); sysPages.mockGps(content); sysPages.clicker(content); pages.timeline(content) }
             else -> pages.settings(content)
         }
     }

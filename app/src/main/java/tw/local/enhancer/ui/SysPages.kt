@@ -36,11 +36,7 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
 
     // =========================== Tab 7 系統 ===========================
 
-    fun system(root: LinearLayout) = with(ui) {
-        if (!Shell.ready()) card(root, "需要 Shizuku") {
-            hint("這一頁大部分功能需要 Shizuku。動畫速度與私人 DNS 只要有「寫入安全設定」權限也能用。")
-            button("授權 Shizuku", primary = true) { pages.requestShizuku() }
-        }
+    fun appManage(root: LinearLayout) = with(ui) {
         card(root, "App 管理（凍結／移除／斷網／背景／匯出）") {
             hint("點 App 可以：停用（凍結）、只對本機使用者移除、單獨斷網、加入或移出背景保活白名單、限制背景執行、匯出 APK。")
             text("⚠ 停用或移除系統 App 前請確認用途；手機異常時可在這裡還原。移除只是對本機使用者隱藏，系統分割區的原檔還在，隨時能還原。", 12.5f, color = badColor)
@@ -61,6 +57,8 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 }
             }
         }
+    }
+    fun keepalive(root: LinearLayout) = with(ui) {
         card(root, "通知保活中心（修 FCM／通知延遲）") {
             hint("陸版系統會殺掉自行安裝的 Google FCM 與國際 App，造成 LINE／FB／WhatsApp 通知延遲、或要開 App 才一次跳出。一鍵把它們加進電池白名單、開背景執行、強制開通知權限。重開機會自動重套。需 Shizuku。")
             button("一鍵保活建議清單（Google＋通訊 App）", primary = true) {
@@ -89,6 +87,8 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
             }
             hint("vivo「自啟動／關聯啟動」是專屬設定，Shizuku 設不到，請另到「設定→應用與權限→權限管理→自啟動」手動開；FCM 被殺是系統層級，保活能大幅改善但非 100%。")
         }
+    }
+    fun apkExport(root: LinearLayout) = with(ui) {
         card(root, "APK 匯出備份（免 Shizuku）") {
             hint("把已安裝的 App 匯出成 APK 檔，方便換機、備份或分享。有分割檔的 App 會匯出成 .apks（zip）。不需要 Shizuku。")
             button("選擇要匯出的 App", primary = true) {
@@ -97,6 +97,8 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 }
             }
         }
+    }
+    fun splitScreen(root: LinearLayout) = with(ui) {
         card(root, "強制全 App 分割畫面／小窗") {
             hint("開啟後，原本被廠商限制不給分割畫面或自由視窗的 App 也能用。需寫入安全設定或 Shizuku；部分設定重開機後才完全生效。")
             val on = SysTools.freeformOn(act)
@@ -106,6 +108,8 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 act.render()
             }
         }
+    }
+    fun darkMode(root: LinearLayout) = with(ui) {
         card(root, "全域強制深色模式") {
             hint("把不支援深色的 App 也套上深色（開發者選項的 Override force-dark）。需 Shizuku。部分 App 會自己擋掉；force-dark 重開機會失效，本 App 會在開機後自動重套。")
             if (!Shell.ready()) status("Shizuku", false) { pages.requestShizuku() }
@@ -117,6 +121,8 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 act.render()
             }
         }
+    }
+    fun animSpeed(root: LinearLayout) = with(ui) {
         card(root, "動畫速度") {
             val cur = SysTools.animScale(act)
             text("目前：${fmt(cur)} 倍", 13f, color = textSub)
@@ -126,6 +132,8 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 act.render()
             }
         }
+    }
+    fun dns(root: LinearLayout) = with(ui) {
         card(root, "私人 DNS（全手機擋廣告，免 VPN）") {
             text("目前：" + SysTools.dnsText(act), 13f, color = textSub)
             for ((v, label) in SysTools.DNS_PRESETS) button(label) {
