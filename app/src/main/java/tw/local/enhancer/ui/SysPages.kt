@@ -61,6 +61,34 @@ class SysPages(private val act: MainActivity, private val pages: Pages) {
                 }
             }
         }
+        card(root, "通知保活中心（修 FCM／通知延遲）") {
+            hint("陸版系統會殺掉自行安裝的 Google FCM 與國際 App，造成 LINE／FB／WhatsApp 通知延遲、或要開 App 才一次跳出。一鍵把它們加進電池白名單、開背景執行、強制開通知權限。重開機會自動重套。需 Shizuku。")
+            button("一鍵保活建議清單（Google＋通訊 App）", primary = true) {
+                if (!Shell.ready()) { pages.requestShizuku(); return@button }
+                App.bg {
+                    val present = SysTools.KEEPALIVE_SUGGEST.filter { Apps.installed(act, it) }
+                    for (p in present) SysTools.enableKeepalive(p, true)
+                    App.ui { act.toast("已保活 ${present.size} 個 App"); act.render() }
+                }
+            }
+            button("自選要保活的 App") {
+                if (!Shell.ready()) { pages.requestShizuku(); return@button }
+                AppPicker.show(act, "要保活哪些 App", SysTools.keepaliveSet(), extra = SysTools.KEEPALIVE_SUGGEST) { picked ->
+                    App.bg {
+                        for (p in picked) SysTools.enableKeepalive(p, true)
+                        for (p in SysTools.keepaliveSet()) if (p !in picked) SysTools.enableKeepalive(p, false)
+                        App.ui { act.toast("已更新保活清單"); act.render() }
+                    }
+                }
+            }
+            val onKa = SysTools.keepaliveSet().filter { Apps.installed(act, it) }
+            hint("目前保活：" + (if (onKa.isEmpty()) "（尚未設定）" else onKa.joinToString("、") { Apps.label(act, it) }))
+            button("強制重連 FCM（重啟 Google Play 服務）") {
+                if (!Shell.ready()) { pages.requestShizuku(); return@button }
+                App.bg { SysTools.reconnectFcm(); App.ui { act.toast("已重啟 Google Play 服務，稍等通知重連") } }
+            }
+            hint("vivo「自啟動／關聯啟動」是專屬設定，Shizuku 設不到，請另到「設定→應用與權限→權限管理→自啟動」手動開；FCM 被殺是系統層級，保活能大幅改善但非 100%。")
+        }
         card(root, "APK 匯出備份（免 Shizuku）") {
             hint("把已安裝的 App 匯出成 APK 檔，方便換機、備份或分享。有分割檔的 App 會匯出成 .apks（zip）。不需要 Shizuku。")
             button("選擇要匯出的 App", primary = true) {
