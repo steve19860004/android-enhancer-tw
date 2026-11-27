@@ -35,6 +35,7 @@ import tw.local.enhancer.feature.timeline.TimelineShizuku
 import tw.local.enhancer.feature.translate.Langs
 import tw.local.enhancer.feature.translate.ScrollTranslator
 import tw.local.enhancer.feature.voice.VoiceIntercept
+import tw.local.enhancer.feature.voicefix.VoiceFix
 import tw.local.enhancer.tiles.FanExpandTile
 import tw.local.enhancer.tiles.ScrollTranslateTile
 
@@ -473,6 +474,54 @@ class Pages(private val act: MainActivity) {
         }
     }
 
+    // ---- Google 地圖麥克風修復（一鍵引導） ----
+    fun mapsMic(root: LinearLayout) = with(ui) {
+        card(root, "Google 地圖麥克風修復（一鍵引導）") {
+            hint("陸版 vivo／小米常見：地圖按麥克風圖示不跳或「無法辨識」。照 ①→⑤ 一步步做，有 ✗ 的先處理。給權限需 Shizuku；裝 App 和下載語言包要手動（Google 限制，無法代勞）。")
+            val st = text("檢查中…", 12.5f, color = textSub)
+            App.bg { val s = VoiceFix.mapsVoiceStatus(act); App.ui { st.text = s } }
+            button("重新檢查狀態") { App.bg { val s = VoiceFix.mapsVoiceStatus(act); App.ui { st.text = s; act.render() } } }
+
+            text("① 安裝必備 App（狀態顯示 ✗ 才要按）", bold = true)
+            button("安裝 Google 語音服務（關鍵缺件）") { openPlay(VoiceFix.TTS_PKG) }
+            button("安裝 Google App（辨識引擎）") { openPlay(VoiceFix.GOOGLE_PKG) }
+
+            text("② 一鍵開麥克風權限（需 Shizuku）", bold = true)
+            button("一鍵給 語音服務／Google／地圖 麥克風", primary = true) {
+                when {
+                    !VoiceFix.ttsInstalled(act) -> act.toast("請先按①安裝 Google 語音服務")
+                    !Shell.ready() -> requestShizuku()
+                    else -> App.bg { val s = VoiceFix.fixMapsVoice(act); App.ui { act.showText("已開啟麥克風權限", s); act.render() } }
+                }
+            }
+
+            text("③ 把語音辨識切回 Google（需 Shizuku）", bold = true)
+            hint("Gboard 語音正常、只有地圖不行，通常就是系統預設辨識被換成陸版的，切回 Google 即可。")
+            button("切回 Google 語音辨識") {
+                if (!Shell.ready() && !Perms.writeSecure(act)) { requestShizuku(); return@button }
+                if (!VoiceFix.googleInstalled(act)) { act.toast("請先安裝 Google App"); return@button }
+                App.bg { val ok = VoiceFix.applyGoogle(act); App.ui { act.toast(if (ok) "已切回 Google 語音辨識" else "失敗"); act.render() } }
+            }
+            if (VoiceFix.canRestore()) button("還原回原本的語音辨識") {
+                App.bg { val ok = VoiceFix.restore(act); App.ui { act.toast(if (ok) "已還原" else "失敗"); act.render() } }
+            }
+
+            text("④ 下載語言包／設語音輸入（手動，一鍵帶你去）", bold = true)
+            hint("最常被忽略、也是多數人『裝了卻講了沒反應』的主因：語言包沒下載、或語音輸入沒選 Google。")
+            button("開啟語音輸入設定（選 Google）") { openVoiceInput() }
+            button("開啟 Google 語音服務（進設定下載語言）") { appDetails(VoiceFix.TTS_PKG) }
+
+            text("⑤ 測試", bold = true)
+            button("開啟 Google 地圖來測試") { launchApp(VoiceFix.MAPS_PKG) }
+
+            hint("──── 失敗時照這個順序查 ────\n" +
+                "1. 收音畫面有跳、但講了沒反應 → 多半是④：語言包沒下載或語音輸入沒選 Google。\n" +
+                "2. 連收音畫面都不跳 → ②麥克風權限沒給，或①Google 語音服務沒裝。\n" +
+                "3. 都做了還不行 → 手機連網後重開機再試；必要時補裝「Android Auto」補底層元件。\n" +
+                "4. Gboard 語音正常、只有地圖不行 → 就是③，把辨識切回 Google。")
+        }
+    }
+
     // ---- 時間軸助手（移植自 Timeline-NoPair 0.26，免 Shizuku） ----
 
     fun timeline(root: LinearLayout) = with(ui) {
@@ -568,6 +617,27 @@ class Pages(private val act: MainActivity) {
         runCatching {
             act.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
         }.onFailure { act.toast("請從手機設定手動開啟這個頁面") }
+    }
+
+    private fun openPlay(pkg: String) {
+        runCatching { act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg"))) }
+            .onFailure {
+                runCatching { act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg"))) }
+                    .onFailure { act.toast("找不到 Play 商店") }
+            }
+    }
+
+    private fun openVoiceInput() {
+        runCatching { act.startActivity(Intent("android.settings.VOICE_INPUT_SETTINGS")) }
+            .onFailure {
+                runCatching { act.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+                act.toast("請到 設定 → 系統 → 語言與輸入 → 語音輸入，選 Google")
+            }
+    }
+
+    private fun launchApp(pkg: String) {
+        val i = act.packageManager.getLaunchIntentForPackage(pkg)
+        if (i != null) act.startActivity(i) else act.toast("找不到該 App")
     }
 
     private fun rememberWidth() {

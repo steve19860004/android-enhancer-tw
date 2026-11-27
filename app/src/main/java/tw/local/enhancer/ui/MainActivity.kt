@@ -161,7 +161,7 @@ class MainActivity : Activity() {
             "comm" -> { pages.callMusic(content); sysPages.msgLog(content); sysPages.keepalive(content) }
             "sys" -> { sysPages.appManage(content); pages.silentInstall(content); sysPages.apkExport(content); sysPages.dns(content); sysPages.animSpeed(content) }
             "scr" -> { sysPages.splitScreen(content); sysPages.darkMode(content); sysPages.volume(content) }
-            "act" -> { pages.voice(content); pages.translate(content); pages.circleSearch(content); pages.imeManager(content); pages.powerCamera(content) }
+            "act" -> { pages.voice(content); pages.mapsMic(content); pages.translate(content); pages.circleSearch(content); pages.imeManager(content); pages.powerCamera(content) }
             "priv" -> { pages.strict(content); pages.photoGuard(content); sysPages.mockGps(content); sysPages.clicker(content); pages.timeline(content) }
             else -> pages.settings(content)
         }
