@@ -18,22 +18,26 @@ android {
     }
 
     signingConfigs {
-        create("fixed") {
-            // 固定簽章：每次 Actions 編出來的 APK 都能直接覆蓋安裝
-            storeFile = file("enhancer.keystore")
-            storePassword = "enhancer123"
-            keyAlias = "enhancer"
-            keyPassword = "enhancer123"
+        create("release") {
+            // 正式簽章由環境變數提供（CI 從 GitHub Secret 解出），密碼不寫進 repo
+            val kf = System.getenv("SIGNING_KEYSTORE_FILE")
+            if (kf != null && file(kf).exists()) {
+                storeFile = file(kf)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("fixed")
+            signingConfig = if (System.getenv("SIGNING_KEYSTORE_FILE") != null)
+                signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
         debug {
-            signingConfig = signingConfigs.getByName("fixed")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
